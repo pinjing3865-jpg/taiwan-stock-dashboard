@@ -3,7 +3,7 @@ import matplotlib.font_manager as fm
 import urllib.request
 import os
 
-# 雲端黑科技：自動下載並掛載開源中文字型 (台北黑體)
+# 1. 確保下載字型檔
 font_path = 'TaipeiSansTCBeta-Regular.ttf'
 if not os.path.exists(font_path):
     try:
@@ -11,29 +11,26 @@ if not os.path.exists(font_path):
     except Exception as e:
         pass
 
-# 註冊字型給 Matplotlib 使用
+# 2. 建立強制字型物件 (繞過 Matplotlib 的快取機制，直接讀取檔案)
 if os.path.exists(font_path):
-    fm.fontManager.addfont(font_path)
-    plt.rcParams['font.sans-serif'] = ['Taipei Sans TC Beta']
+    my_font = fm.FontProperties(fname=font_path)
 else:
-    plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial']
-    
-plt.rcParams['axes.unicode_minus'] = False # 確保負號正常顯示
+    my_font = fm.FontProperties(family='sans-serif')
 
 def plot_rrg_chart(rrg_all_history):
-    """繪製 RRG 動能旋轉圖 (雲端中文字型自動載入版)"""
+    """繪製 RRG 動能旋轉圖 (強制字型掛載版)"""
     fig, ax = plt.subplots(figsize=(10, 8), facecolor='black')
     ax.set_facecolor('black')
     
-    # 畫出象限格線 (基準線為 100)
+    # 畫出象限格線
     ax.axvline(100, color='gray', linestyle='--', alpha=0.7)
     ax.axhline(100, color='gray', linestyle='--', alpha=0.7)
     
-    # 象限名稱標示
-    ax.text(100.5, 101, '第一象限 [領先]', color='gray', fontsize=12, alpha=0.6)
-    ax.text(98.5, 101, '第二象限 [轉強]', color='gray', fontsize=12, alpha=0.6)
-    ax.text(98.5, 99, '第三象限 [落後]', color='gray', fontsize=12, alpha=0.6)
-    ax.text(100.5, 99, '第四象限 [轉弱]', color='gray', fontsize=12, alpha=0.6)
+    # 象限名稱標示 (強制塞入 fontproperties=my_font)
+    ax.text(100.5, 101, '第一象限 [領先]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
+    ax.text(98.5, 101, '第二象限 [轉強]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
+    ax.text(98.5, 99, '第三象限 [落後]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
+    ax.text(100.5, 99, '第四象限 [轉弱]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
     
     drawn_count = 0
     if rrg_all_history:
@@ -59,15 +56,16 @@ def plot_rrg_chart(rrg_all_history):
             ax.scatter(x[:-1], y[:-1], color='white', alpha=0.4, s=25)
             ax.scatter(x[-1], y[-1], color='red' if is_strong else 'white', s=80, zorder=5)
             
-            # 標示產業名稱 (動態跟隨最後一點)
-            ax.text(x[-1] + 0.1, y[-1] + 0.1, sector_name, color='red' if is_strong else 'white', fontsize=10, weight='bold')
+            # 標示產業名稱 (強制塞入 fontproperties=my_font)
+            ax.text(x[-1] + 0.1, y[-1] + 0.1, sector_name, color='red' if is_strong else 'white', fontproperties=my_font, size=10, weight='bold')
 
     if drawn_count == 0:
-        ax.text(100, 100, '目前尚無 RRG 資料可顯示', color='yellow', fontsize=14, ha='center', weight='bold')
+        ax.text(100, 100, '目前尚無 RRG 資料可顯示', color='yellow', fontproperties=my_font, size=14, ha='center', weight='bold')
 
-    ax.set_title('RRG 產業動能旋轉圖', color='white', fontsize=15, pad=15)
-    ax.set_xlabel('RS-Ratio (相對強弱)', color='white', fontsize=12)
-    ax.set_ylabel('RS-Momentum (相對動能)', color='white', fontsize=12)
+    # 標題與軸標籤 (強制塞入 fontproperties=my_font)
+    ax.set_title('RRG 產業動能旋轉圖', color='white', fontproperties=my_font, size=15, pad=15)
+    ax.set_xlabel('RS-Ratio (相對強弱)', color='white', fontproperties=my_font, size=12)
+    ax.set_ylabel('RS-Momentum (相對動能)', color='white', fontproperties=my_font, size=12)
     
     ax.tick_params(colors='white', labelsize=10)
     for spine in ax.spines.values():
