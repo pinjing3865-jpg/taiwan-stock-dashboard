@@ -11,11 +11,11 @@ if not os.path.exists(font_path):
     except Exception as e:
         pass
 
-# 2. 建立強制字型物件 (繞過 Matplotlib 的快取機制，直接讀取檔案)
+# 2. 建立強制字型物件 (修正參數，避免 Linux 解析器崩潰)
 if os.path.exists(font_path):
     my_font = fm.FontProperties(fname=font_path)
 else:
-    my_font = fm.FontProperties(family='sans-serif')
+    my_font = fm.FontProperties() # 👈 改成空白，安全呼叫系統預設
 
 def plot_rrg_chart(rrg_all_history):
     """繪製 RRG 動能旋轉圖 (強制字型掛載版)"""
