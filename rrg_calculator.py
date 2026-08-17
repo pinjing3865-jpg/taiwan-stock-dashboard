@@ -58,3 +58,4 @@ def calculate_rrg_quadrants(df_sector, df_taiex, period=5):
             
     df_merged['Quadrant'] = quadrants
     return df_merged
+
