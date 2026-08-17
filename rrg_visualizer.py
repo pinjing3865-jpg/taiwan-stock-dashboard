@@ -24,7 +24,7 @@ if not os.path.exists(font_path):
 
 # 絕對安全的字型綁定
 if os.path.exists(font_path) and os.path.getsize(font_path) >= 1000000:
-    my_font = fm.FontProperties(fname=font_path)
+    my_font = fm.FontProperties()
 else:
     # 🔥 就是這裡！絕對不加任何參數，讓它使用最安全的系統預設，保證不崩潰！
     my_font = fm.FontProperties()
