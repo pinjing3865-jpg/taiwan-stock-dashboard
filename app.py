@@ -33,7 +33,7 @@ my_custom_sectors = {
     '電子零組件': ['2327', '3023', '3533', '2492', '6217', '3042', '6283', '8042', '4938'],
     '塑膠': ['1301', '1303', '1326', '1304', '1307', '1308', '1309', '1310', '1312', '1313', '1314', '1315'],
     '電機': ['1504', '1503', '1519', '1513', '1514', '1515', '1516', '1521', '1525', '1532', '1536'],
-    'IC-製造': ['2330', '2303', '6770', '5347', '6525', '5351', '6531', '3707'],
+    'IC-製造': ['2330', '2303', '6770', '5347', '6525', '6531', '3707'],
     'LCD面板': ['2409', '3481', '3149', '6116'],
     '化學工業': ['1723', '4739', '1707', '1732', '1709', '1711', '1783', '4720', '4755'],
     '被動元件': ['2327', '2456', '3026', '6173', '2498', '5328', '2472', '3624', '8043', '6207'],
@@ -91,11 +91,9 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
-# 🌟 新增：自製專業分析指標與資料擷取函數
 @st.cache_data(ttl=300)
 def get_pro_stock_data(ticker, interval_label):
     try:
-        # 定義不同週期的抓取參數
         tf_map = {
             "日K (近半年)": ("1d", "6mo"),
             "週K (近2年)": ("1wk", "2y"),
@@ -104,7 +102,6 @@ def get_pro_stock_data(ticker, interval_label):
         }
         inter, per = tf_map[interval_label]
         
-        # 抓資料
         stock = yf.Ticker(f"{ticker}.TW")
         df = stock.history(period=per, interval=inter)
         if df.empty:
@@ -118,27 +115,21 @@ def get_pro_stock_data(ticker, interval_label):
         date_col = df.columns[0]
         df.rename(columns={date_col: 'Date'}, inplace=True)
         
-        # 轉換日期格式作為 X 軸標籤 (解決分K顯示問題)
         df['Date_str'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M') if inter in ['15m', '60m'] else df['Date'].dt.strftime('%Y-%m-%d')
         
-        # 過濾空值與無交易量
         for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         df = df[df['Volume'] > 0].copy()
 
-        # 🌟 運算技術指標 🌟
-        # 1. 均線 (MA)
         df['MA5'] = df['Close'].rolling(window=5).mean()
         df['MA20'] = df['Close'].rolling(window=20).mean()
 
-        # 2. MACD (12, 26, 9)
         ema12 = df['Close'].ewm(span=12, adjust=False).mean()
         ema26 = df['Close'].ewm(span=26, adjust=False).mean()
         df['MACD'] = ema12 - ema26
         df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
         df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
 
-        # 3. RSI (14)
         delta = df['Close'].diff()
         up = delta.clip(lower=0)
         down = -1 * delta.clip(upper=0)
@@ -223,7 +214,8 @@ def fetch_margins_via_yf(tickers):
 @st.cache_data(ttl=3600)
 def get_all_data(selected_sectors):
     revenue_df = fetch_latest_monthly_revenue()
-    df_taiex, market_stocks_data = build_history_market_data(trading_days=25)
+    # 🌟 參數 1：將歷史市場資料天數拉長至 60 天，提供平滑化計算基礎
+    df_taiex, market_stocks_data = build_history_market_data(trading_days=60)
     target_dict = {k: my_custom_sectors[k] for k in selected_sectors if k in my_custom_sectors}
     sector_dataframes = generate_sector_dataframes(market_stocks_data, target_dict)
     return revenue_df, df_taiex, sector_dataframes
@@ -276,7 +268,8 @@ for sector_name, df_sector in sector_dataframes.items():
     if df_sector is None or df_sector.empty or 'Close' not in df_sector.columns:
         continue
         
-    rrg_result = calculate_rrg_quadrants(df_sector, df_taiex, period=5)
+    # 🌟 參數 2：將 RRG 動能計算週期從 5 天拉長至 15 天，過濾單日雜訊，實現波段趨勢平滑化
+    rrg_result = calculate_rrg_quadrants(df_sector, df_taiex, period=15)
     if rrg_result is None or rrg_result.empty:
         continue
         
@@ -291,7 +284,7 @@ for sector_name, df_sector in sector_dataframes.items():
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    st.subheader("📊 RRG 動能旋轉圖 (完整成分股計算)")
+    st.subheader("📊 RRG 動能旋轉圖 (波段平滑化過濾雜訊)")
     if rrg_all_history:
         fig = plot_rrg_chart(rrg_all_history)
         st.pyplot(fig)
@@ -362,7 +355,7 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 Python 原生頂級技術分析儀表板 (四層子圖表)
+                # 🌟 Python 原生頂級技術分析面板 (四層子圖表)
                 # ==========================================
                 st.markdown("---")
                 
@@ -370,7 +363,6 @@ with col2:
                 with col_title:
                     st.subheader("📈 專業級技術分析面板 (無版權限制)")
                 with col_tf:
-                    # 🌟 自由切換不同週期，包含分K
                     selected_tf = st.radio("切換 K 線週期：", ["日K (近半年)", "週K (近2年)", "60分K (近2個月)", "15分K (近1個月)"], horizontal=True)
                 
                 if event.selection.rows:
@@ -387,13 +379,11 @@ with col2:
                     df_kline = get_pro_stock_data(ticker, selected_tf)
                     
                     if not df_kline.empty:
-                        # 🌟 建立超精美的四層互動圖表
                         fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
                                             row_heights=[0.5, 0.15, 0.15, 0.2], 
                                             vertical_spacing=0.02,
                                             subplot_titles=("K線與移動平均", "成交量", "MACD (12, 26, 9)", "RSI (14)"))
                         
-                        # 決定 K 線的紅漲白跌顏色陣列
                         colors = ['#ff0000' if row['Close'] >= row['Open'] else '#ffffff' for i, row in df_kline.iterrows()]
                         
                         # 1. 主圖：K線
@@ -420,7 +410,6 @@ with col2:
                         fig.add_hline(y=70, line_dash="dash", line_color="gray", row=4, col=1)
                         fig.add_hline(y=30, line_dash="dash", line_color="gray", row=4, col=1)
 
-                        # 🌟 設定暗黑專業版面，並強制 X 軸類型為字串(Category)，完美去除假日與非交易時間的醜陋空白斷層！
                         fig.update_layout(
                             template='plotly_dark',
                             height=850,
@@ -430,13 +419,10 @@ with col2:
                             plot_bgcolor='#0a0a0a',
                             margin=dict(l=10, r=10, t=30, b=10)
                         )
-                        # 強制讓所有 X 軸用字串排列，完美解決分K圖與日K圖的週末斷層問題
                         fig.update_xaxes(type='category')
-                        # 隱藏刻度文字以保持畫面乾淨，只留最下面一層的日期
                         fig.update_xaxes(showticklabels=False, row=1, col=1)
                         fig.update_xaxes(showticklabels=False, row=2, col=1)
                         fig.update_xaxes(showticklabels=False, row=3, col=1)
-                        # 將 X 軸刻度數量減少，避免字擠在一起
                         fig.update_xaxes(nticks=10, row=4, col=1)
 
                         st.plotly_chart(fig, use_container_width=True)
