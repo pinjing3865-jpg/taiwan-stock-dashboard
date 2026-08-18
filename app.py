@@ -315,6 +315,25 @@ with col2:
         st.info("在您勾選的群組中，目前沒有偵測到動能向上的標的。")
     else:
         for sector, quadrant in strong_sectors.items():
+            # 取得該族群最新的 RS-Ratio 與 RS-Momentum 數值
+            latest_data = rrg_all_history[sector].iloc[-1]
+            rs_ratio = latest_data['RS-Ratio']
+            rs_momentum = latest_data['RS-Momentum']
+            
+            # 🌟 智慧動能狀態判定邏輯
+            alert_msg = ""
+            if rs_ratio > 101.5 and rs_momentum > 101.5:
+                alert_msg = "🔥 【警示：動能過熱，短線當心乖離過大或高檔震盪】"
+            elif rs_momentum > 101 and rs_ratio < 100:
+                alert_msg = "🚀 【提示：強勢翻多，剛突破中軸轉強】"
+            elif rs_ratio > 101 and rs_momentum < 100:
+                alert_msg = "⚠️ 【提示：高檔回檔，動能正在轉弱降溫】"
+            else:
+                alert_msg = "📈 【提示：波段穩定運行中】"
+                
+            st.markdown(f"#### 🔥 【{sector}】")
+            st.caption(f"狀態：{quadrant} | RS-Ratio: {rs_ratio:.2f} | RS-Momentum: {rs_momentum:.2f}")
+            st.info(alert_msg)
             st.markdown(f"#### 🔥 【{sector}】")
             st.caption(f"狀態：{quadrant}")
             
