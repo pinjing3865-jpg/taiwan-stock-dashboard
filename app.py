@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 import time
 
 # 匯入分析模組
-from twse_crawler import fetch_twse_index_data
 from rrg_calculator import calculate_rrg_quadrants
-from custom_sector_builder import build_custom_sector_index
 from mops_revenue_crawler import fetch_latest_monthly_revenue
 from rrg_visualizer import plot_rrg_chart
-from mops_margin_crawler import fetch_financial_margins  # 🌟 新增的三率爬蟲
+from mops_margin_crawler import fetch_financial_margins 
+from twse_market_core import build_history_market_data, generate_sector_dataframes # 🌟 新增的全市場極速引擎
 
 # ==========================================
 # 網頁基本設定
@@ -110,11 +109,17 @@ def get_benchmark_history(days=25):
 
 @st.cache_data(ttl=3600)
 def get_all_data(selected_sectors):
+    # 1. 抓取營收與三率
     revenue_df = fetch_latest_monthly_revenue()
-    margin_df = fetch_financial_margins() # 🌟 加入三率資料
-    df_taiex = get_benchmark_history(days=25)
+    margin_df = fetch_financial_margins()
+    
+    # 2. 獲取全市場歷史快取包 (耗時動作集中在此，但會顯示進度條，且有快取)
+    df_taiex, market_stocks_data = build_history_market_data(trading_days=25)
+    
+    # 3. 瞬間組裝使用者勾選的產業 (0.1秒完成)
     target_dict = {k: my_custom_sectors[k] for k in selected_sectors if k in my_custom_sectors}
-    sector_dataframes = build_custom_sector_index(target_dict, days_to_fetch=25)
+    sector_dataframes = generate_sector_dataframes(market_stocks_data, target_dict)
+    
     return revenue_df, margin_df, df_taiex, sector_dataframes
 
 # ==========================================
