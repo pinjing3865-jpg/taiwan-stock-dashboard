@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
-import json
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -89,18 +88,6 @@ sector_categories = {
     "🏗️ 傳統產業": ['航運', '鋼鐵', '塑膠', '電機', '化學工業', '營建', '水泥', '玻璃陶瓷', '紙業', '紡織纖維'],
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
-
-@st.cache_data(ttl=3600)
-def get_stock_kline(ticker):
-    try:
-        stock = yf.Ticker(f"{ticker}.TW")
-        df = stock.history(period="6mo")
-        if df.empty:
-            stock = yf.Ticker(f"{ticker}.TWO")
-            df = stock.history(period="6mo")
-        return df
-    except:
-        return pd.DataFrame()
 
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
@@ -313,10 +300,10 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 TradingView Lightweight Charts (官方輕量版開發引擎)
+                # 🌟 TradingView 原廠滿血版 (結合傳送門按鈕)
                 # ==========================================
                 st.markdown("---")
-                st.subheader("📈 個股技術線圖 (TradingView 核心引擎驅動)")
+                st.subheader("📈 個股技術線圖 (TradingView 完整功能版)")
                 
                 if event.selection.rows:
                     selected_idx = event.selection.rows[0]
@@ -326,103 +313,54 @@ with col2:
                     ticker = str(strong_stocks.iloc[0]['證券代號'])
                     name = strong_stocks.iloc[0]['證券名稱']
                 
-                st.info(f"📌 目前顯示線圖：**{ticker} {name}** (請直接點擊上方表格內的任意列來切換)")
+                st.info(f"📌 目前選擇：**{ticker} {name}** (請直接點擊上方表格內的任意列來切換)")
                 
-                with st.spinner(f'正在載入 {ticker} {name} 的 TradingView 線圖...'):
-                    df_kline = get_stock_kline(ticker)
-                    
-                    if not df_kline.empty:
-                        # 1. 確保抓得到日期欄位
-                        df_kline = df_kline.reset_index()
-                        df_kline.rename(columns={df_kline.columns[0]: 'Date'}, inplace=True)
-                        
-                        # 2. 轉換為純字串日期
-                        df_kline['Date'] = pd.to_datetime(df_kline['Date'])
-                        df_kline['Date_str'] = df_kline['Date'].dt.strftime('%Y-%m-%d')
-                        
-                        # 3. 🛡️ 醫療級濾水器：處理所有會讓 TradingView 當機的髒資料
-                        # 將數值強制轉為浮點數，無法轉換的補 0
-                        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                            df_kline[col] = pd.to_numeric(df_kline[col], errors='coerce').fillna(0)
-                        
-                        # 剔除收盤價為 0 的無效交易日 (這會讓圖表當機)
-                        df_kline = df_kline[df_kline['Close'] > 0]
-                        
-                        # 嚴格排序並清除重複日期
-                        df_kline = df_kline.sort_values('Date_str')
-                        df_kline = df_kline.drop_duplicates(subset=['Date_str'], keep='last')
-                        
-                        candle_data = []
-                        volume_data = []
-                        
-                        for _, row in df_kline.iterrows():
-                            is_up = row['Close'] >= row['Open']
-                            vol_color = "#ff0000" if is_up else "#ffffff"
-                            
-                            candle_data.append({
-                                "time": row['Date_str'],
-                                "open": float(row['Open']),
-                                "high": float(row['High']),
-                                "low": float(row['Low']),
-                                "close": float(row['Close'])
-                            })
-                            volume_data.append({
-                                "time": row['Date_str'],
-                                "value": float(row['Volume']),
-                                "color": vol_color
-                            })
-                            
-                        # 如果過濾完確定有資料，才開始渲染圖表
-                        if len(candle_data) > 0:
-                            candle_json = json.dumps(candle_data)
-                            volume_json = json.dumps(volume_data)
-                            
-                            # 🌟 鎖定 3.8.0 穩定版 CDN
-                            tv_light_html = f"""
-                            <div id="tvchart" style="width: 100%; height: 500px;"></div>
-                            <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
-                            <script>
-                            try {{
-                                const chartOptions = {{
-                                    layout: {{ textColor: 'white', background: {{ type: 'solid', color: '#000000' }} }},
-                                    grid: {{ vertLines: {{ color: '#1f1f1f' }}, horzLines: {{ color: '#1f1f1f' }} }},
-                                    crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
-                                    rightPriceScale: {{ borderColor: '#1f1f1f' }},
-                                    timeScale: {{ borderColor: '#1f1f1f' }}
-                                }};
-                                
-                                const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
-
-                                const candlestickSeries = chart.addCandlestickSeries({{
-                                    upColor: '#ff0000', downColor: '#ffffff',
-                                    borderUpColor: '#ff0000', borderDownColor: '#ffffff',
-                                    wickUpColor: '#ff0000', wickDownColor: '#ffffff'
-                                }});
-                                candlestickSeries.setData({candle_json});
-
-                                const volumeSeries = chart.addHistogramSeries({{
-                                    priceFormat: {{ type: 'volume' }},
-                                    priceScaleId: '', 
-                                }});
-                                volumeSeries.setData({volume_json});
-                                
-                                // 🌟 3.8.0 穩定版專屬語法：將成交量壓縮在畫面底部 20%
-                                chart.priceScale('').applyOptions({{
-                                    scaleMargins: {{ top: 0.8, bottom: 0 }},
-                                }});
-                                
-                                chart.timeScale().fitContent();
-                                
-                                window.addEventListener('resize', () => {{
-                                    chart.resize(document.getElementById('tvchart').clientWidth, 500);
-                                }});
-                            }} catch (e) {{
-                                document.getElementById('tvchart').innerHTML = "<h3 style='color:#ff4444; margin:20px;'>圖表渲染失敗: " + e.message + "</h3>";
-                            }}
-                            </script>
-                            """
-                            components.html(tv_light_html, height=500)
-                        else:
-                            st.warning("⚠️ 該檔股票近半年無有效交易資料。")
-                    else:
-                        st.error(f"⚠️ 無法取得 {ticker} 的歷史 K 線資料。")
+                # 🌟 加入傳送門按鈕，萬一跳出彈窗，可以一鍵前往無干擾的官網！
+                st.caption("💡 說明：因版權限制，下方圖表若跳出阻擋視窗，請直接點擊下方按鈕前往官網使用完整指標！")
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    st.link_button(f"🚀 前往 TradingView 查看【{ticker} {name}】(上市)", f"https://www.tradingview.com/chart/?symbol=TWSE:{ticker}", use_container_width=True)
+                with col_btn2:
+                    st.link_button(f"🚀 前往 TradingView 查看【{ticker} {name}】(上櫃)", f"https://www.tradingview.com/chart/?symbol=TPEX:{ticker}", use_container_width=True)
+                
+                # 嵌入原廠 Advanced Widget，並維持紅漲白跌設定
+                tv_html = f"""
+                <div class="tradingview-widget-container">
+                  <div id="tradingview_{ticker}"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                  <script type="text/javascript">
+                  new TradingView.widget(
+                  {{
+                  "width": "100%",
+                  "height": 600,
+                  "symbol": "TWSE:{ticker}",
+                  "interval": "D",
+                  "timezone": "Asia/Taipei",
+                  "theme": "dark",
+                  "style": "1",
+                  "locale": "zh_TW",
+                  "enable_publishing": false,
+                  "backgroundColor": "#000000",
+                  "gridColor": "#1f1f1f",
+                  "hide_top_toolbar": false,
+                  "hide_legend": false,
+                  "save_image": false,
+                  "container_id": "tradingview_{ticker}",
+                  "studies": [
+                    "Volume@tv-basicstudies",
+                    "MASimple@tv-basicstudies"
+                  ],
+                  "overrides": {{
+                      "mainSeriesProperties.candleStyle.upColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.downColor": "#ffffff",
+                      "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
+                      "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
+                  }}
+                  }}
+                  );
+                  </script>
+                </div>
+                """
+                components.html(tv_html, height=600)
