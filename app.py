@@ -104,11 +104,16 @@ def get_pro_stock_data(ticker, interval_label):
         }
         inter, per = tf_map[interval_label]
         
-        stock = yf.Ticker(f"{ticker}.TW")
-        df = stock.history(period=per, interval=inter)
-        if df.empty:
-            stock = yf.Ticker(f"{ticker}.TWO")
-            df = stock.history(period=per, interval=inter)
+        # 🌟 擴充備用搜尋網址，防範部分股票代號抓取失敗
+        df = pd.DataFrame()
+        for suffix in [".TW", ".TWO", ""]:
+            try:
+                stock = yf.Ticker(f"{ticker}{suffix}")
+                df = stock.history(period=per, interval=inter)
+                if not df.empty:
+                    break
+            except:
+                continue
             
         if df.empty:
             return pd.DataFrame()
@@ -120,7 +125,8 @@ def get_pro_stock_data(ticker, interval_label):
         df['Date_str'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M') if inter in ['15m', '60m'] else df['Date'].dt.strftime('%Y-%m-%d')
         
         for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         df = df[df['Volume'] > 0].copy()
 
         df['MA5'] = df['Close'].rolling(window=5).mean()
