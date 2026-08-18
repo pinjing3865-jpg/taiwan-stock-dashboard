@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
-import json # 🌟 新增：用於將資料轉換給 TradingView
+import json
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -348,7 +348,7 @@ with col2:
                         # 剔除收盤價為 0 的無效交易日 (這會讓圖表當機)
                         df_kline = df_kline[df_kline['Close'] > 0]
                         
-                        # 嚴格排序並清除重複日期 (TradingView 只要看到日期重複就會死當)
+                        # 嚴格排序並清除重複日期
                         df_kline = df_kline.sort_values('Date_str')
                         df_kline = df_kline.drop_duplicates(subset=['Date_str'], keep='last')
                         
@@ -377,51 +377,51 @@ with col2:
                             candle_json = json.dumps(candle_data)
                             volume_json = json.dumps(volume_data)
                             
-                            # 🌟 鎖定 3.8.0 穩定版 CDN，避免官方亂改版導致函數失效
-                        tv_light_html = f"""
-                        <div id="tvchart" style="width: 100%; height: 500px;"></div>
-                        <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
-                        <script>
-                        try {{
-                            const chartOptions = {{
-                                layout: {{ textColor: 'white', background: {{ type: 'solid', color: '#000000' }} }},
-                                grid: {{ vertLines: {{ color: '#1f1f1f' }}, horzLines: {{ color: '#1f1f1f' }} }},
-                                crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
-                                rightPriceScale: {{ borderColor: '#1f1f1f' }},
-                                timeScale: {{ borderColor: '#1f1f1f' }}
-                            }};
-                            
-                            const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
+                            # 🌟 鎖定 3.8.0 穩定版 CDN
+                            tv_light_html = f"""
+                            <div id="tvchart" style="width: 100%; height: 500px;"></div>
+                            <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+                            <script>
+                            try {{
+                                const chartOptions = {{
+                                    layout: {{ textColor: 'white', background: {{ type: 'solid', color: '#000000' }} }},
+                                    grid: {{ vertLines: {{ color: '#1f1f1f' }}, horzLines: {{ color: '#1f1f1f' }} }},
+                                    crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+                                    rightPriceScale: {{ borderColor: '#1f1f1f' }},
+                                    timeScale: {{ borderColor: '#1f1f1f' }}
+                                }};
+                                
+                                const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
 
-                            const candlestickSeries = chart.addCandlestickSeries({{
-                                upColor: '#ff0000', downColor: '#ffffff',
-                                borderUpColor: '#ff0000', borderDownColor: '#ffffff',
-                                wickUpColor: '#ff0000', wickDownColor: '#ffffff'
-                            }});
-                            candlestickSeries.setData({candle_json});
+                                const candlestickSeries = chart.addCandlestickSeries({{
+                                    upColor: '#ff0000', downColor: '#ffffff',
+                                    borderUpColor: '#ff0000', borderDownColor: '#ffffff',
+                                    wickUpColor: '#ff0000', wickDownColor: '#ffffff'
+                                }});
+                                candlestickSeries.setData({candle_json});
 
-                            const volumeSeries = chart.addHistogramSeries({{
-                                priceFormat: {{ type: 'volume' }},
-                                priceScaleId: '', 
-                            }});
-                            volumeSeries.setData({volume_json});
-                            
-                            // 🌟 3.8.0 穩定版專屬語法：將成交量壓縮在畫面底部 20%
-                            chart.priceScale('').applyOptions({{
-                                scaleMargins: {{ top: 0.8, bottom: 0 }},
-                            }});
-                            
-                            chart.timeScale().fitContent();
-                            
-                            window.addEventListener('resize', () => {{
-                                chart.resize(document.getElementById('tvchart').clientWidth, 500);
-                            }});
-                        }} catch (e) {{
-                            document.getElementById('tvchart').innerHTML = "<h3 style='color:#ff4444; margin:20px;'>圖表渲染失敗: " + e.message + "</h3>";
-                        }}
-                        </script>
-                        """
-                        components.html(tv_light_html, height=500)
+                                const volumeSeries = chart.addHistogramSeries({{
+                                    priceFormat: {{ type: 'volume' }},
+                                    priceScaleId: '', 
+                                }});
+                                volumeSeries.setData({volume_json});
+                                
+                                // 🌟 3.8.0 穩定版專屬語法：將成交量壓縮在畫面底部 20%
+                                chart.priceScale('').applyOptions({{
+                                    scaleMargins: {{ top: 0.8, bottom: 0 }},
+                                }});
+                                
+                                chart.timeScale().fitContent();
+                                
+                                window.addEventListener('resize', () => {{
+                                    chart.resize(document.getElementById('tvchart').clientWidth, 500);
+                                }});
+                            }} catch (e) {{
+                                document.getElementById('tvchart').innerHTML = "<h3 style='color:#ff4444; margin:20px;'>圖表渲染失敗: " + e.message + "</h3>";
+                            }}
+                            </script>
+                            """
+                            components.html(tv_light_html, height=500)
                         else:
                             st.warning("⚠️ 該檔股票近半年無有效交易資料。")
                     else:
