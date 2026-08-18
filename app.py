@@ -1,9 +1,11 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -89,15 +91,65 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
-# 🌟 新增：自動探測是上市還是上櫃的函數
-@st.cache_data(ttl=86400)
-def get_tradingview_exchange(ticker):
+# 🌟 新增：自製專業分析指標與資料擷取函數
+@st.cache_data(ttl=300)
+def get_pro_stock_data(ticker, interval_label):
     try:
-        if not yf.Ticker(f"{ticker}.TW").history(period="1d").empty:
-            return "TWSE"
+        # 定義不同週期的抓取參數
+        tf_map = {
+            "日K (近半年)": ("1d", "6mo"),
+            "週K (近2年)": ("1wk", "2y"),
+            "60分K (近2個月)": ("60m", "60d"),
+            "15分K (近1個月)": ("15m", "1mo")
+        }
+        inter, per = tf_map[interval_label]
+        
+        # 抓資料
+        stock = yf.Ticker(f"{ticker}.TW")
+        df = stock.history(period=per, interval=inter)
+        if df.empty:
+            stock = yf.Ticker(f"{ticker}.TWO")
+            df = stock.history(period=per, interval=inter)
+            
+        if df.empty:
+            return pd.DataFrame()
+
+        df = df.reset_index()
+        date_col = df.columns[0]
+        df.rename(columns={date_col: 'Date'}, inplace=True)
+        
+        # 轉換日期格式作為 X 軸標籤 (解決分K顯示問題)
+        df['Date_str'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M') if inter in ['15m', '60m'] else df['Date'].dt.strftime('%Y-%m-%d')
+        
+        # 過濾空值與無交易量
+        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        df = df[df['Volume'] > 0].copy()
+
+        # 🌟 運算技術指標 🌟
+        # 1. 均線 (MA)
+        df['MA5'] = df['Close'].rolling(window=5).mean()
+        df['MA20'] = df['Close'].rolling(window=20).mean()
+
+        # 2. MACD (12, 26, 9)
+        ema12 = df['Close'].ewm(span=12, adjust=False).mean()
+        ema26 = df['Close'].ewm(span=26, adjust=False).mean()
+        df['MACD'] = ema12 - ema26
+        df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+        df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+
+        # 3. RSI (14)
+        delta = df['Close'].diff()
+        up = delta.clip(lower=0)
+        down = -1 * delta.clip(upper=0)
+        ema_up = up.ewm(com=13, adjust=False).mean()
+        ema_down = down.ewm(com=13, adjust=False).mean()
+        rs = ema_up / ema_down
+        df['RSI'] = 100 - (100 / (1 + rs))
+
+        return df
     except:
-        pass
-    return "TPEX"
+        return pd.DataFrame()
 
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
@@ -310,71 +362,83 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 TradingView 原廠滿血版 (防空白污染 + 動態 ID 防快取)
+                # 🌟 Python 原生頂級技術分析儀表板 (四層子圖表)
                 # ==========================================
                 st.markdown("---")
-                st.subheader("📈 個股技術線圖 (TradingView 完整功能版)")
+                
+                col_title, col_tf = st.columns([2, 1])
+                with col_title:
+                    st.subheader("📈 專業級技術分析面板 (無版權限制)")
+                with col_tf:
+                    # 🌟 自由切換不同週期，包含分K
+                    selected_tf = st.radio("切換 K 線週期：", ["日K (近半年)", "週K (近2年)", "60分K (近2個月)", "15分K (近1個月)"], horizontal=True)
                 
                 if event.selection.rows:
                     selected_idx = event.selection.rows[0]
-                    # 🌟 魔法防線：加上 .strip() 把看不見的空白全部砍掉！
                     ticker = str(strong_stocks.iloc[selected_idx]['證券代號']).strip()
                     name = str(strong_stocks.iloc[selected_idx]['證券名稱']).strip()
                 else:
                     ticker = str(strong_stocks.iloc[0]['證券代號']).strip()
                     name = str(strong_stocks.iloc[0]['證券名稱']).strip()
                 
-                # 自動判斷這檔股票是上市(TWSE)還是上櫃(TPEX)
-                tv_exchange = get_tradingview_exchange(ticker)
-                tv_symbol = f"{tv_exchange}:{ticker}"
+                st.info(f"📌 目前分析標的：**{ticker} {name}**")
                 
-                # 🌟 動態生成獨一無二的 Container ID，強迫 Streamlit 與瀏覽器不要拿舊圖表來敷衍我們
-                unique_container_id = f"tv_{ticker}_{int(time.time() * 1000)}"
-                
-                st.info(f"📌 目前選擇：**{ticker} {name}** (市場別：{tv_exchange})")
-                st.caption("💡 說明：因版權限制，下方圖表若跳出阻擋視窗，請直接點擊下方按鈕前往官網使用完整指標！")
-                
-                # 精準導航按鈕
-                st.link_button(f"🚀 前往 TradingView 官網查看【{ticker} {name}】完整圖表", f"https://www.tradingview.com/chart/?symbol={tv_symbol}", use_container_width=True)
-                
-                # 嵌入原廠 Advanced Widget，並帶入去空白的 tv_symbol 與獨一無二的 unique_container_id
-                tv_html = f"""
-                <div class="tradingview-widget-container">
-                  <div id="{unique_container_id}"></div>
-                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                  <script type="text/javascript">
-                  new TradingView.widget(
-                  {{
-                  "width": "100%",
-                  "height": 600,
-                  "symbol": "{tv_symbol}",
-                  "interval": "D",
-                  "timezone": "Asia/Taipei",
-                  "theme": "dark",
-                  "style": "1",
-                  "locale": "zh_TW",
-                  "enable_publishing": false,
-                  "backgroundColor": "#000000",
-                  "gridColor": "#1f1f1f",
-                  "hide_top_toolbar": false,
-                  "hide_legend": false,
-                  "save_image": false,
-                  "container_id": "{unique_container_id}",
-                  "studies": [
-                    "Volume@tv-basicstudies",
-                    "MASimple@tv-basicstudies"
-                  ],
-                  "overrides": {{
-                      "mainSeriesProperties.candleStyle.upColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.downColor": "#ffffff",
-                      "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
-                      "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
-                  }}
-                  }}
-                  );
-                  </script>
-                </div>
-                """
-                components.html(tv_html, height=600)
+                with st.spinner(f'正在運算 {ticker} 的 MACD 與 RSI 技術指標...'):
+                    df_kline = get_pro_stock_data(ticker, selected_tf)
+                    
+                    if not df_kline.empty:
+                        # 🌟 建立超精美的四層互動圖表
+                        fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
+                                            row_heights=[0.5, 0.15, 0.15, 0.2], 
+                                            vertical_spacing=0.02,
+                                            subplot_titles=("K線與移動平均", "成交量", "MACD (12, 26, 9)", "RSI (14)"))
+                        
+                        # 決定 K 線的紅漲白跌顏色陣列
+                        colors = ['#ff0000' if row['Close'] >= row['Open'] else '#ffffff' for i, row in df_kline.iterrows()]
+                        
+                        # 1. 主圖：K線
+                        fig.add_trace(go.Candlestick(
+                            x=df_kline['Date_str'], open=df_kline['Open'], high=df_kline['High'], low=df_kline['Low'], close=df_kline['Close'],
+                            name="K線", increasing_line_color='#ff0000', increasing_fillcolor='#ff0000', decreasing_line_color='#ffffff', decreasing_fillcolor='#ffffff'
+                        ), row=1, col=1)
+                        
+                        # 1-1. 主圖：均線 MA5, MA20
+                        fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MA5'], name='MA5', line=dict(color='#2962FF', width=1.5)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MA20'], name='MA20', line=dict(color='#FFD600', width=1.5)), row=1, col=1)
+
+                        # 2. 副圖：成交量
+                        fig.add_trace(go.Bar(x=df_kline['Date_str'], y=df_kline['Volume'], name="成交量", marker_color=colors), row=2, col=1)
+
+                        # 3. 副圖：MACD
+                        fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MACD'], name='MACD', line=dict(color='#00E676', width=1.5)), row=3, col=1)
+                        fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MACD_Signal'], name='Signal', line=dict(color='#FF1744', width=1.5)), row=3, col=1)
+                        macd_colors = ['#ff0000' if val > 0 else '#ffffff' for val in df_kline['MACD_Hist']]
+                        fig.add_trace(go.Bar(x=df_kline['Date_str'], y=df_kline['MACD_Hist'], name='Histogram', marker_color=macd_colors), row=3, col=1)
+
+                        # 4. 副圖：RSI
+                        fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['RSI'], name='RSI', line=dict(color='#E040FB', width=1.5)), row=4, col=1)
+                        fig.add_hline(y=70, line_dash="dash", line_color="gray", row=4, col=1)
+                        fig.add_hline(y=30, line_dash="dash", line_color="gray", row=4, col=1)
+
+                        # 🌟 設定暗黑專業版面，並強制 X 軸類型為字串(Category)，完美去除假日與非交易時間的醜陋空白斷層！
+                        fig.update_layout(
+                            template='plotly_dark',
+                            height=850,
+                            xaxis_rangeslider_visible=False,
+                            showlegend=False,
+                            paper_bgcolor='#0a0a0a',
+                            plot_bgcolor='#0a0a0a',
+                            margin=dict(l=10, r=10, t=30, b=10)
+                        )
+                        # 強制讓所有 X 軸用字串排列，完美解決分K圖與日K圖的週末斷層問題
+                        fig.update_xaxes(type='category')
+                        # 隱藏刻度文字以保持畫面乾淨，只留最下面一層的日期
+                        fig.update_xaxes(showticklabels=False, row=1, col=1)
+                        fig.update_xaxes(showticklabels=False, row=2, col=1)
+                        fig.update_xaxes(showticklabels=False, row=3, col=1)
+                        # 將 X 軸刻度數量減少，避免字擠在一起
+                        fig.update_xaxes(nticks=10, row=4, col=1)
+
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.error(f"⚠️ 無法取得 {ticker} 的歷史 K 線資料。")
