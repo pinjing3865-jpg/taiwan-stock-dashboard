@@ -1,71 +1,66 @@
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-import os
-
-# 1. 取得程式所在資料夾的「絕對路徑」，確保雲端不迷路
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# 2. 指定使用最純粹的 .ttf 檔案 (標楷體)
-font_path = os.path.join(current_dir, 'kaiu.ttf')
-
-# 3. 掛載字型
-if os.path.exists(font_path):
-    my_font = fm.FontProperties(fname=font_path)
-else:
-    my_font = fm.FontProperties()
-
-plt.rcParams['axes.unicode_minus'] = False
+import numpy as np
 
 def plot_rrg_chart(rrg_all_history):
-    fig, ax = plt.subplots(figsize=(10, 8), facecolor='black')
-    ax.set_facecolor('black')
+    # 建立畫布
+    fig, ax = plt.subplots(figsize=(10, 8), facecolor='#0a0a0a')
+    ax.set_facecolor('#0a0a0a')
     
-    # 畫出 100 基準線
-    ax.axvline(100, color='gray', linestyle='--', alpha=0.7)
-    ax.axhline(100, color='gray', linestyle='--', alpha=0.7)
+    # 畫出十字象限基準線 (以 100 為中心)
+    ax.axhline(100, color='#555555', linestyle='--', linewidth=1.5, alpha=0.7)
+    ax.axvline(100, color='#555555', linestyle='--', linewidth=1.5, alpha=0.7)
     
-    # 🌟 魔法在這裡：使用 transform=ax.transAxes，將文字錨點定在 0~1 的畫布邊緣
-    # (0,0) 是左下角，(1,1) 是右上角
-    ax.text(0.98, 0.96, '第一象限 [領先]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='right', va='top', transform=ax.transAxes)
-    ax.text(0.02, 0.96, '第二象限 [轉強]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='left', va='top', transform=ax.transAxes)
-    ax.text(0.02, 0.04, '第三象限 [落後]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='left', va='bottom', transform=ax.transAxes)
-    ax.text(0.98, 0.04, '第四象限 [轉弱]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='right', va='bottom', transform=ax.transAxes)
-    
-    drawn_count = 0
-    if rrg_all_history:
-        for sector_name, df in rrg_all_history.items():
-            if df is None or df.empty or 'RS-Ratio' not in df.columns or 'RS-Momentum' not in df.columns:
-                continue
-                
-            x = df['RS-Ratio'].values
-            y = df['RS-Momentum'].values
-            
-            if len(x) == 0 or len(y) == 0:
-                continue
-                
-            drawn_count += 1
-            latest_quadrant = df.iloc[-1]['Quadrant'] if 'Quadrant' in df.columns else ""
-            
-            # 維持「紅是漲白是跌」的視覺判斷邏輯
-            is_strong = "第一象限" in latest_quadrant or "第二象限" in latest_quadrant
-            line_color = 'red' if is_strong else 'white'
-            
-            ax.plot(x, y, color=line_color, alpha=0.7, linewidth=1.5)
-            ax.scatter(x[:-1], y[:-1], color='white', alpha=0.4, s=25)
-            ax.scatter(x[-1], y[-1], color='red' if is_strong else 'white', s=80, zorder=5)
-            
-            ax.text(x[-1] + 0.1, y[-1] + 0.1, sector_name, color='red' if is_strong else 'white', fontproperties=my_font, size=10, weight='bold')
+    # 四象限背景標示文字
+    ax.text(102, 102.5, "🔥 第一象限 [領先]", color='#FF5252', fontsize=11, fontweight='bold', alpha=0.6)
+    ax.text(97.5, 102.5, "🚀 第二象限 [轉強]", color='#448AFF', fontsize=11, fontweight='bold', alpha=0.6)
+    ax.text(97.5, 97.2, "💤 第三象限 [落後]", color='#B0BEC5', fontsize=11, fontweight='bold', alpha=0.6)
+    ax.text(102, 97.2, "⚠️ 第四象限 [轉弱]", color='#FFD740', fontsize=11, fontweight='bold', alpha=0.6)
 
-    if drawn_count == 0:
-        # 無資料的提示語也置中固定
-        ax.text(0.5, 0.5, '目前尚無 RRG 資料可顯示', color='yellow', fontproperties=my_font, size=14, ha='center', va='center', weight='bold', transform=ax.transAxes)
+    colors = ['#FF5252', '#448AFF', '#00E676', '#FFD740', '#E040FB', '#00B0FF', '#FF6E40', '#69F0AE']
+    
+    for idx, (sector_name, df_result) in enumerate(rrg_all_history.items()):
+        if df_result is None or df_result.empty:
+            continue
+            
+        color = colors[idx % len(colors)]
+        
+        x = df_result['RS-Ratio'].values
+        y = df_result['RS-Momentum'].values
+        
+        # 畫出平滑的動能旋轉軌跡線
+        ax.plot(x, y, color=color, linewidth=2, alpha=0.7, label=sector_name)
+        ax.scatter(x, color=color, s=20, alpha=0.5)
+        
+        # 取得最新一個交易日的數值來判定狀態
+        last_x = x[-1]
+        last_y = y[-1]
+        
+        # 🌟 數值動能警示判定邏輯
+        status_tag = ""
+        if last_x > 101.5 and last_y > 101.5:
+            status_tag = " [🔥過熱]"
+        elif last_y > 101 and last_x < 100:
+            status_tag = " [🚀強勢翻多]"
+        elif last_x > 101 and last_y < 100:
+            status_tag = " [⚠️降溫回檔]"
+        else:
+            status_tag = " [穩定]"
+        
+        # 標出最新位置實心圓點
+        ax.scatter(last_x, last_y, color=color, s=120, zorder=5, edgecolor='white', linewidth=1.5)
+        
+        # 在圖表上直接印出帶有狀態標籤的族群名稱
+        label_text = f"  {sector_name}{status_tag}"
+        ax.annotate(label_text, (last_x, last_y), color='white', fontsize=10, fontweight='bold',
+                    va='center', ha='left', bbox=dict(boxstyle='round,pad=0.2', facecolor='#1f1f1f', edgecolor=color, alpha=0.85))
 
-    ax.set_title('RRG 產業動能旋轉圖', color='white', fontproperties=my_font, size=15, pad=15)
-    ax.set_xlabel('RS-Ratio (相對強弱)', color='white', fontproperties=my_font, size=12)
-    ax.set_ylabel('RS-Momentum (相對動能)', color='white', fontproperties=my_font, size=12)
+    ax.set_title("RRG 產業動能旋轉圖 (內建即時過熱與轉強提示)", color='white', fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel("RS-Ratio (相對強勢)", color='white', fontsize=11)
+    ax.set_ylabel("RS-Momentum (相對動能)", color='white', fontsize=11)
     
     ax.tick_params(colors='white', labelsize=10)
     for spine in ax.spines.values():
-        spine.set_edgecolor('gray')
+        spine.set_edgecolor('#333333')
         
     plt.tight_layout()
     return fig
