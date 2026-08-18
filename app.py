@@ -78,6 +78,19 @@ my_custom_sectors = {
     '網通設備': ['2345', '3596', '5388', '3380', '6285', '2419', '3234']
 }
 
+# ==========================================
+# 粗分類字典 (用於產生折疊選單)
+# ==========================================
+sector_categories = {
+    "📊 半導體族群": ['IC-製造', 'IC-設計', 'IC-封測', 'IC-通路', '矽晶圓', 'DRAM', '二極體'],
+    "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散熱模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
+    "🖥️ 電腦與軟體": ['筆記型電腦', '電腦周邊產品', '板卡', '工業電腦', '軟體-系統整合', '軟體-其他', '軟體-遊戲', '安全監控'],
+    "📡 光電與網通": ['光學鏡片', 'LCD面板', 'LCD零件', 'LED及光元件', '顯示器', '光碟片', '網通設備', '低軌衛星'],
+    "🚗 車用與軍工": ['車用電子', '汽車零組件', '航天軍工'],
+    "🏗️ 傳統產業": ['航運', '鋼鐵', '塑膠', '電機', '化學工業', '營建', '水泥', '玻璃陶瓷', '紙業', '紡織纖維'],
+    "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
+}
+
 @st.cache_data(ttl=3600)
 def get_benchmark_history(days=25):
     today = datetime.now()
@@ -106,21 +119,26 @@ def get_all_data(selected_sectors):
     return revenue_df, df_taiex, sector_dataframes
 
 # ==========================================
-# 側邊欄：多選控制台
+# 側邊欄：多選控制台 (折疊面板設計)
 # ==========================================
 st.sidebar.title("🎛️ 法人戰情室控制台")
 st.sidebar.markdown("---")
 
-default_selection = ['PCB-製造', '光學鏡片', '航運', '矽晶圓', '散熱模組', '電源供應器', 'IC-設計', 'IC-封測', '網通設備']
+default_selection = []
 
-st.sidebar.markdown("**請勾選欲分析的細產業 (可複選)：**")
+st.sidebar.markdown("**📁 請展開粗分類並勾選細產業：**")
 selected_sectors = []
 
-# 建立所有的核取方塊
-for sector in list(my_custom_sectors.keys()):
-    is_checked = sector in default_selection
-    if st.sidebar.checkbox(sector, value=is_checked, key=f"chk_{sector}"):
-        selected_sectors.append(sector)
+# 產生分類折疊面板與裡面的核取方塊
+for category_name, sub_sectors in sector_categories.items():
+    # 使用 st.sidebar.expander 建立折疊面板 (預設收起)
+    with st.sidebar.expander(category_name, expanded=False):
+        for sector in sub_sectors:
+            if sector in my_custom_sectors:  # 確保字典有這個產業
+                is_checked = sector in default_selection
+                # 在折疊面板內建立核取方塊
+                if st.checkbox(sector, value=is_checked, key=f"chk_{sector}"):
+                    selected_sectors.append(sector)
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 強制更新資料"):
