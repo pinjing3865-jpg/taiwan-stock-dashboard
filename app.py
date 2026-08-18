@@ -113,11 +113,14 @@ st.sidebar.markdown("---")
 
 default_selection = ['PCB-製造', '光學鏡片', '航運', '矽晶圓', '散熱模組', '電源供應器', 'IC-設計', 'IC-封測', '網通設備']
 
-selected_sectors = st.sidebar.multiselect(
-    "請勾選欲分析的細產業 (可複選)：",
-    options=list(my_custom_sectors.keys()),
-    default=default_selection
-)
+st.sidebar.markdown("**請勾選欲分析的細產業 (可複選)：**")
+selected_sectors = []
+
+# 建立所有的核取方塊
+for sector in list(my_custom_sectors.keys()):
+    is_checked = sector in default_selection
+    if st.sidebar.checkbox(sector, value=is_checked, key=f"chk_{sector}"):
+        selected_sectors.append(sector)
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 強制更新資料"):
