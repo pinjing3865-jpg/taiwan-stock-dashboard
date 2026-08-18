@@ -19,13 +19,16 @@ def plot_rrg_chart(rrg_all_history):
     fig, ax = plt.subplots(figsize=(10, 8), facecolor='black')
     ax.set_facecolor('black')
     
+    # 畫出 100 基準線
     ax.axvline(100, color='gray', linestyle='--', alpha=0.7)
     ax.axhline(100, color='gray', linestyle='--', alpha=0.7)
     
-    ax.text(100.5, 101, '第一象限 [領先]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
-    ax.text(98.5, 101, '第二象限 [轉強]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
-    ax.text(98.5, 99, '第三象限 [落後]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
-    ax.text(100.5, 99, '第四象限 [轉弱]', color='gray', fontproperties=my_font, size=12, alpha=0.6)
+    # 🌟 魔法在這裡：使用 transform=ax.transAxes，將文字錨點定在 0~1 的畫布邊緣
+    # (0,0) 是左下角，(1,1) 是右上角
+    ax.text(0.98, 0.96, '第一象限 [領先]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='right', va='top', transform=ax.transAxes)
+    ax.text(0.02, 0.96, '第二象限 [轉強]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='left', va='top', transform=ax.transAxes)
+    ax.text(0.02, 0.04, '第三象限 [落後]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='left', va='bottom', transform=ax.transAxes)
+    ax.text(0.98, 0.04, '第四象限 [轉弱]', color='gray', fontproperties=my_font, size=14, alpha=0.5, ha='right', va='bottom', transform=ax.transAxes)
     
     drawn_count = 0
     if rrg_all_history:
@@ -42,6 +45,7 @@ def plot_rrg_chart(rrg_all_history):
             drawn_count += 1
             latest_quadrant = df.iloc[-1]['Quadrant'] if 'Quadrant' in df.columns else ""
             
+            # 維持「紅是漲白是跌」的視覺判斷邏輯
             is_strong = "第一象限" in latest_quadrant or "第二象限" in latest_quadrant
             line_color = 'red' if is_strong else 'white'
             
@@ -52,7 +56,8 @@ def plot_rrg_chart(rrg_all_history):
             ax.text(x[-1] + 0.1, y[-1] + 0.1, sector_name, color='red' if is_strong else 'white', fontproperties=my_font, size=10, weight='bold')
 
     if drawn_count == 0:
-        ax.text(100, 100, '目前尚無 RRG 資料可顯示', color='yellow', fontproperties=my_font, size=14, ha='center', weight='bold')
+        # 無資料的提示語也置中固定
+        ax.text(0.5, 0.5, '目前尚無 RRG 資料可顯示', color='yellow', fontproperties=my_font, size=14, ha='center', va='center', weight='bold', transform=ax.transAxes)
 
     ax.set_title('RRG 產業動能旋轉圖', color='white', fontproperties=my_font, size=15, pad=15)
     ax.set_xlabel('RS-Ratio (相對強弱)', color='white', fontproperties=my_font, size=12)
