@@ -1,38 +1,21 @@
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import urllib.request
 import os
 
-font_path = 'TaipeiSansTCBeta-Regular.ttf'
+# 1. 取得程式所在資料夾的「絕對路徑」，確保雲端不迷路
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 2. 指定使用最純粹的 .ttf 檔案 (標楷體)
+font_path = os.path.join(current_dir, 'kaiu.ttf')
 
-# 清除壞檔 (破除下載 0KB 的死循環)
-if os.path.exists(font_path) and os.path.getsize(font_path) < 1000000:
-    try:
-        os.remove(font_path)
-    except:
-        pass
-
-# 嘗試下載字型
-if not os.path.exists(font_path):
-    try:
-        url = 'https://raw.githubusercontent.com/jptc/Taipei-Sans-TC/master/TaipeiSansTCBeta-Regular.ttf'
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response, open(font_path, 'wb') as out_file:
-            out_file.write(response.read())
-    except Exception:
-        pass
-
-# 絕對安全的字型綁定
-if os.path.exists(font_path) and os.path.getsize(font_path) >= 1000000:
-    my_font = fm.FontProperties()
+# 3. 掛載字型
+if os.path.exists(font_path):
+    my_font = fm.FontProperties(fname=font_path)
 else:
-    # 🔥 就是這裡！絕對不加任何參數，讓它使用最安全的系統預設，保證不崩潰！
     my_font = fm.FontProperties()
 
 plt.rcParams['axes.unicode_minus'] = False
 
 def plot_rrg_chart(rrg_all_history):
-    """繪製 RRG 動能旋轉圖 (終極防崩潰版)"""
     fig, ax = plt.subplots(figsize=(10, 8), facecolor='black')
     ax.set_facecolor('black')
     
@@ -59,7 +42,6 @@ def plot_rrg_chart(rrg_all_history):
             drawn_count += 1
             latest_quadrant = df.iloc[-1]['Quadrant'] if 'Quadrant' in df.columns else ""
             
-            # 使用者校正邏輯：紅是漲(強)、白是跌(弱)
             is_strong = "第一象限" in latest_quadrant or "第二象限" in latest_quadrant
             line_color = 'red' if is_strong else 'white'
             
@@ -82,4 +64,3 @@ def plot_rrg_chart(rrg_all_history):
         
     plt.tight_layout()
     return fig
-
