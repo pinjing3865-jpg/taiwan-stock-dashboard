@@ -9,6 +9,7 @@ from rrg_calculator import calculate_rrg_quadrants
 from custom_sector_builder import build_custom_sector_index
 from mops_revenue_crawler import fetch_latest_monthly_revenue
 from rrg_visualizer import plot_rrg_chart
+from mops_margin_crawler import fetch_financial_margins  # 🌟 新增的三率爬蟲
 
 # ==========================================
 # 網頁基本設定
@@ -16,7 +17,7 @@ from rrg_visualizer import plot_rrg_chart
 st.set_page_config(page_title="台股全市場完整成分股戰情室", layout="wide", page_icon="📈")
 
 # ==========================================
-# 完整成分股升級版細產業字典 (涵蓋龍頭與中小型二線廠)
+# 完整成分股細產業與粗分類字典
 # ==========================================
 my_custom_sectors = {
     'PCB-製造': ['2368', '3037', '2313', '4958', '6274', '5381', '3044', '5469', '6213', '8046', '6292', '5349'],
@@ -78,9 +79,6 @@ my_custom_sectors = {
     '網通設備': ['2345', '3596', '5388', '3380', '6285', '2419', '3234']
 }
 
-# ==========================================
-# 粗分類字典 (用於產生折疊選單)
-# ==========================================
 sector_categories = {
     "📊 半導體族群": ['IC-製造', 'IC-設計', 'IC-封測', 'IC-通路', '矽晶圓', 'DRAM', '二極體'],
     "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散熱模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
@@ -113,30 +111,28 @@ def get_benchmark_history(days=25):
 @st.cache_data(ttl=3600)
 def get_all_data(selected_sectors):
     revenue_df = fetch_latest_monthly_revenue()
+    margin_df = fetch_financial_margins() # 🌟 加入三率資料
     df_taiex = get_benchmark_history(days=25)
     target_dict = {k: my_custom_sectors[k] for k in selected_sectors if k in my_custom_sectors}
     sector_dataframes = build_custom_sector_index(target_dict, days_to_fetch=25)
-    return revenue_df, df_taiex, sector_dataframes
+    return revenue_df, margin_df, df_taiex, sector_dataframes
 
 # ==========================================
-# 側邊欄：多選控制台 (折疊面板設計)
+# 側邊欄控制台
 # ==========================================
 st.sidebar.title("🎛️ 法人戰情室控制台")
 st.sidebar.markdown("---")
 
-default_selection = []
+default_selection = [] 
 
 st.sidebar.markdown("**📁 請展開粗分類並勾選細產業：**")
 selected_sectors = []
 
-# 產生分類折疊面板與裡面的核取方塊
 for category_name, sub_sectors in sector_categories.items():
-    # 使用 st.sidebar.expander 建立折疊面板 (預設收起)
     with st.sidebar.expander(category_name, expanded=False):
         for sector in sub_sectors:
-            if sector in my_custom_sectors:  # 確保字典有這個產業
+            if sector in my_custom_sectors:
                 is_checked = sector in default_selection
-                # 在折疊面板內建立核取方塊
                 if st.checkbox(sector, value=is_checked, key=f"chk_{sector}"):
                     selected_sectors.append(sector)
 
@@ -148,15 +144,15 @@ if st.sidebar.button("🔄 強制更新資料"):
 # ==========================================
 # 主畫面
 # ==========================================
-st.title("🚀 台股全市場完整成分股動能 x 營收決策儀表板")
+st.title("🚀 台股全市場動能 x 營收 x 三率決策儀表板")
 st.markdown("---")
 
 if not selected_sectors:
     st.warning("⚠️ 請從左側側邊欄至少勾選一個細產業！")
     st.stop()
 
-with st.spinner('正在同步全市場完整成分股與最新月營收資料中...'):
-    revenue_df, df_taiex, sector_dataframes = get_all_data(tuple(selected_sectors))
+with st.spinner('正在同步全市場成分股、最新月營收與財報三率資料中...'):
+    revenue_df, margin_df, df_taiex, sector_dataframes = get_all_data(tuple(selected_sectors))
 
 if revenue_df is None or df_taiex.empty:
     st.error("資料載入失敗，請確認網路連線。")
@@ -192,7 +188,7 @@ with col1:
         st.warning("⚠️ 目前尚無足夠的 RRG 歷史數據可供繪圖。")
 
 with col2:
-    st.subheader("🏆 動能向上之強勢族群與基本面")
+    st.subheader("🏆 動能強勢族群：營收與三率檢驗")
     
     if not strong_sectors:
         st.info("在您勾選的產業中，目前沒有偵測到動能向上的標的。")
@@ -208,19 +204,47 @@ with col2:
                 st.warning("尚無營收資料")
                 continue
                 
+            # 挑出營收成長的強勢股
             strong_stocks = sector_revenue[sector_revenue['營收YoY(%)'] > 0].copy()
+            
+            # 🌟 將財報三率合併進來
+            if not margin_df.empty:
+                strong_stocks = pd.merge(strong_stocks, margin_df, on='證券代號', how='left')
+                
             strong_stocks = strong_stocks.sort_values('營收YoY(%)', ascending=False)
             
             if strong_stocks.empty:
                 st.error("⚠️ 成分股最新營收皆衰退，留意純籌碼炒作。")
             else:
-                st.success("✅ 具備基本面支援 (YoY > 0)")
+                st.success("✅ 具備基本面支援 (營收YoY > 0)")
+                
+                # 🌟 動態設定要顯示的防呆欄位
+                display_cols = ["證券代號", "證券名稱", "當月營收", "營收YoY(%)"]
+                
+                # 自動判斷是否有累計營收(年營收率)
+                if "累計營收YoY(%)" in strong_stocks.columns:
+                    display_cols.append("累計營收YoY(%)")
+                elif "累計營收成長率(%)" in strong_stocks.columns:
+                    display_cols.append("累計營收成長率(%)")
+                    
+                # 加入三率
+                for m in ['毛利率(%)', '營益率(%)', '淨利率(%)']:
+                    if m in strong_stocks.columns:
+                        display_cols.append(m)
+                
+                strong_stocks = strong_stocks[display_cols]
+                
+                # 🌟 統一設定百分比格式
+                col_config = {
+                    "當月營收": st.column_config.NumberColumn(format="%d"),
+                    "營收YoY(%)": st.column_config.NumberColumn(format="%.2f %%")
+                }
+                for extra_col in display_cols[4:]:
+                    col_config[extra_col] = st.column_config.NumberColumn(format="%.2f %%")
+                
                 st.dataframe(
                     strong_stocks,
-                    column_config={
-                        "當月營收": st.column_config.NumberColumn(format="%d"),
-                        "營收YoY(%)": st.column_config.NumberColumn(format="%.2f %%")
-                    },
+                    column_config=col_config,
                     hide_index=True,
                     use_container_width=True
                 )
