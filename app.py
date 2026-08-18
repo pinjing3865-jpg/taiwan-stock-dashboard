@@ -291,6 +291,9 @@ for sector_name, df_sector in sector_dataframes.items():
         continue
         
     rrg_all_history[sector_name] = rrg_result
+
+    print("目前成功計算出 RRG 的產業：", list(rrg_all_history.keys()))
+
     
     if 'Quadrant' in rrg_result.columns and not rrg_result.empty:
         latest_status = rrg_result.iloc[-1]['Quadrant']
@@ -298,13 +301,13 @@ for sector_name, df_sector in sector_dataframes.items():
             strong_sectors[sector_name] = latest_status
 
 # 左右雙欄配置
-col1, col2 = st.columns([1.5, 1])
+col1, col2 = st.columns([1.5, 2])
 
 with col1:
     st.subheader("📊 RRG 動能旋轉圖 (波段平滑化過濾雜訊)")
     if rrg_all_history:
-        fig = plot_rrg_chart(rrg_all_history)
-        st.pyplot(fig, use_container_width=True)
+       fig = plot_rrg_chart(rrg_all_history)
+       st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("⚠️ 目前尚無足夠的 RRG 歷史數據可供繪圖。")
 

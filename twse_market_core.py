@@ -86,21 +86,29 @@ def build_history_market_data(trading_days=25):
     return df_taiex, market_stocks_data
 
 def generate_sector_dataframes(market_stocks_data, target_dict):
-    """從已經抓好的全市場快取包中，瞬間組裝出各產業的歷史 DataFrame"""
+    """從全市場快取包中組裝各產業 DataFrame，加入防斷層與型別對齊處理"""
     sector_dataframes = {}
     sorted_dates = sorted(list(market_stocks_data.keys()))
     
     for sector_name, stock_list in target_dict.items():
         sector_history = []
         for date_str in sorted_dates:
-            daily_df = market_stocks_data[date_str]
-            # 瞬間從全市場包中篩選出該產業的成分股
-            target_stocks = daily_df[daily_df['證券代號'].isin(stock_list)]
+            daily_df = market_stocks_data.get(date_str)
+            if daily_df is None:
+                continue
+            
+            # 確保代號皆為字串以正確匹配
+            daily_df['證券代號'] = daily_df['證券代號'].astype(str)
+            target_stocks = daily_df[daily_df['證券代號'].isin([str(s) for s in stock_list])]
+            
             if not target_stocks.empty:
                 avg_close = target_stocks['收盤價'].mean()
                 sector_history.append({'Date': date_str, 'Close': avg_close})
         
-        if sector_history:
-            sector_dataframes[sector_name] = pd.DataFrame(sector_history)
+        # 只要有 5 天以上的歷史數據就允許繪製 RRG
+        if len(sector_history) >= 5:
+            df = pd.DataFrame(sector_history)
+            df['Date'] = pd.to_datetime(df['Date'], format='%Y%m%d')
+            sector_dataframes[sector_name] = df.sort_values('Date')
             
     return sector_dataframes
