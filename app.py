@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components # 🌟 新增：用於嵌入 TradingView 網頁元件
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -80,7 +81,7 @@ my_custom_sectors = {
 
 sector_categories = {
     "📊 半導體族群": ['IC-製造', 'IC-設計', 'IC-封測', 'IC-通路', '矽晶圓', 'DRAM', '二極體'],
-    "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散抓模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
+    "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散熱模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
     "🖥️ 電腦與軟體": ['筆記型電腦', '電腦周邊產品', '板卡', '工業電腦', '軟體-系統整合', '軟體-其他', '軟體-遊戲', '安全監控'],
     "📡 光電與網通": ['光學鏡片', 'LCD面板', 'LCD零件', 'LED及光元件', '顯示器', '光碟片', '網通設備', '低軌衛星'],
     "🚗 車用與軍工": ['車用電子', '汽車零組件', '航天軍工'],
@@ -88,7 +89,6 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
-# 🌟 進階版 yfinance 動態三率引擎 (含歷史財報比對與三升判定)
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
     margin_data = []
@@ -100,12 +100,10 @@ def fetch_margins_via_yf(tickers):
                 stock = yf.Ticker(f"{ticker}.TWO")
                 q_fin = stock.quarterly_financials
 
-            # 如果成功抓到歷史財報且至少有兩季資料
             if not q_fin.empty and q_fin.shape[1] >= 2:
                 latest = q_fin.iloc[:, 0]
                 prev = q_fin.iloc[:, 1]
 
-                # 防呆尋找對應的會計科目
                 def safe_get(series, keys):
                     for k in keys:
                         if k in series.index and pd.notnull(series[k]) and series[k] != 0:
@@ -120,7 +118,6 @@ def fetch_margins_via_yf(tickers):
                 r1, g1, o1, n1 = safe_get(latest, rev_keys), safe_get(latest, gp_keys), safe_get(latest, op_keys), safe_get(latest, ni_keys)
                 r2, g2, o2, n2 = safe_get(prev, rev_keys), safe_get(prev, gp_keys), safe_get(prev, op_keys), safe_get(prev, ni_keys)
 
-                # 計算 最新一季(1) 與 上一季(2) 的三率
                 gm1 = (g1 / r1 * 100) if g1 and r1 else None
                 om1 = (o1 / r1 * 100) if o1 and r1 else None
                 nm1 = (n1 / r1 * 100) if n1 and r1 else None
@@ -129,7 +126,6 @@ def fetch_margins_via_yf(tickers):
                 om2 = (o2 / r2 * 100) if o2 and r2 else None
                 nm2 = (n2 / r2 * 100) if n2 and r2 else None
 
-                # 格式化輸出字串 (包含增減幅度與視覺箭頭)
                 def format_margin(v1, v2):
                     if v1 is None: return None
                     if v2 is None: return f"{v1:.2f}%"
@@ -137,7 +133,6 @@ def fetch_margins_via_yf(tickers):
                     arrow = "🔺" if diff > 0 else ("🔻" if diff < 0 else "➖")
                     return f"{v1:.2f}% ({arrow}{diff:+.2f})"
 
-                # 判定是否「三率三升」
                 is_3_up = False
                 if gm1 and gm2 and om1 and om2 and nm1 and nm2:
                     if (gm1 > gm2) and (om1 > om2) and (nm1 > nm2):
@@ -151,7 +146,6 @@ def fetch_margins_via_yf(tickers):
                     '淨利率(季增減)': format_margin(nm1, nm2)
                 })
             else:
-                # 備用方案：只抓到最新資料
                 info = stock.info
                 margin_data.append({
                     '證券代號': str(ticker),
@@ -259,7 +253,6 @@ with col2:
                 st.warning("尚無營收資料")
                 continue
                 
-            # 挑出營收成長的強勢股
             strong_stocks = sector_revenue[sector_revenue['營收YoY(%)'] > 0].copy()
             strong_stocks = strong_stocks.sort_values('營收YoY(%)', ascending=False)
             
@@ -281,14 +274,12 @@ with col2:
                 elif "累計營收成長率(%)" in strong_stocks.columns:
                     display_cols.append("累計營收成長率(%)")
                     
-                # 🌟 將全新的字串格式三率欄位加入顯示
                 for m in ['三率狀態', '毛利率(季增減)', '營益率(季增減)', '淨利率(季增減)']:
                     if m in strong_stocks.columns:
                         display_cols.append(m)
                 
                 strong_stocks = strong_stocks[display_cols]
                 
-                # 因為三率現在是帶有箭頭符號的字串，所以我們把它從數字格式排版中移除，讓它以原本的字串顯示
                 col_config = {
                     "當月營收": st.column_config.NumberColumn(format="%d"),
                     "營收YoY(%)": st.column_config.NumberColumn(format="%.2f %%")
@@ -304,3 +295,62 @@ with col2:
                     hide_index=True,
                     use_container_width=True
                 )
+                
+                # ==========================================
+                # 🌟 新增：TradingView 動態 K 線圖嵌入區塊
+                # ==========================================
+                st.markdown("---")
+                st.subheader("📈 個股技術線圖 (TradingView即時連動)")
+                
+                # 建立下拉式選單，讓使用者從上方選出的強勢股中直接挑選
+                stock_options = strong_stocks['證券代號'].astype(str) + " " + strong_stocks['證券名稱']
+                selected_stock = st.selectbox(f"請選擇要查看線圖的【{sector}】成分股：", stock_options.tolist(), key=f"tv_select_{sector}")
+                
+                if selected_stock:
+                    # 取出股票代號
+                    ticker = selected_stock.split(" ")[0]
+                    
+                    # 提示文字 (萬一遇到上櫃股票，可引導使用者手動修改)
+                    st.caption("💡 小提示：若圖表顯示 Invalid Symbol，請點擊圖表左上角的放大鏡，手動將 TWSE 改為 TPEX 即可。")
+                    
+                    # 建立 TradingView 專屬 HTML 語法，注入「紅漲白跌」配色設定
+                    tv_html = f"""
+                    <div class="tradingview-widget-container">
+                      <div id="tradingview_{ticker}"></div>
+                      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                      <script type="text/javascript">
+                      new TradingView.widget(
+                      {{
+                      "width": "100%",
+                      "height": 550,
+                      "symbol": "TWSE:{ticker}",
+                      "interval": "D",
+                      "timezone": "Asia/Taipei",
+                      "theme": "dark",
+                      "style": "1",
+                      "locale": "zh_TW",
+                      "enable_publishing": false,
+                      "backgroundColor": "#000000",
+                      "gridColor": "#1f1f1f",
+                      "hide_top_toolbar": false,
+                      "hide_legend": false,
+                      "save_image": false,
+                      "container_id": "tradingview_{ticker}",
+                      "studies": [
+                        "Volume@tv-basicstudies"
+                      ],
+                      "overrides": {{
+                          "mainSeriesProperties.candleStyle.upColor": "#ff0000",
+                          "mainSeriesProperties.candleStyle.downColor": "#ffffff",
+                          "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
+                          "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
+                          "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
+                          "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
+                      }}
+                      }}
+                      );
+                      </script>
+                    </div>
+                    """
+                    # 使用 streamlit.components 將 HTML 渲染出來
+                    components.html(tv_html, height=550)
