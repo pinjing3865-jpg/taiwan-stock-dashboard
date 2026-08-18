@@ -332,26 +332,33 @@ with col2:
                     df_kline = get_stock_kline(ticker)
                     
                     if not df_kline.empty:
+                        # 1. 確保抓得到日期欄位
                         df_kline = df_kline.reset_index()
+                        df_kline.rename(columns={df_kline.columns[0]: 'Date'}, inplace=True)
                         
-                        # 1. 抓出日期欄位 (防呆：yfinance 有時會命名為 Datetime)
-                        date_col = 'Date' if 'Date' in df_kline.columns else ('Datetime' if 'Datetime' in df_kline.columns else df_kline.columns[0])
-                        df_kline['Date_str'] = df_kline[date_col].dt.strftime('%Y-%m-%d')
+                        # 2. 轉換為純字串日期
+                        df_kline['Date'] = pd.to_datetime(df_kline['Date'])
+                        df_kline['Date_str'] = df_kline['Date'].dt.strftime('%Y-%m-%d')
                         
-                        # 2. 🛡️ 核心濾水器：把會讓 TradingView 崩潰的髒資料全部清掉！
-                        df_kline = df_kline.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume']) # 殺掉空值
-                        df_kline = df_kline.drop_duplicates(subset=['Date_str']) # 殺掉重複日期
-                        df_kline = df_kline.sort_values('Date_str') # 嚴格依照日期從舊到新排好
+                        # 3. 🛡️ 醫療級濾水器：處理所有會讓 TradingView 當機的髒資料
+                        # 將數值強制轉為浮點數，無法轉換的補 0
+                        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                            df_kline[col] = pd.to_numeric(df_kline[col], errors='coerce').fillna(0)
+                        
+                        # 剔除收盤價為 0 的無效交易日 (這會讓圖表當機)
+                        df_kline = df_kline[df_kline['Close'] > 0]
+                        
+                        # 嚴格排序並清除重複日期 (TradingView 只要看到日期重複就會死當)
+                        df_kline = df_kline.sort_values('Date_str')
+                        df_kline = df_kline.drop_duplicates(subset=['Date_str'], keep='last')
                         
                         candle_data = []
                         volume_data = []
                         
                         for _, row in df_kline.iterrows():
-                            # 判斷漲跌以決定成交量的顏色 (紅是漲白是跌)
                             is_up = row['Close'] >= row['Open']
                             vol_color = "#ff0000" if is_up else "#ffffff"
                             
-                            # 強制轉型為標準 float，避免 json 轉換出錯
                             candle_data.append({
                                 "time": row['Date_str'],
                                 "open": float(row['Open']),
@@ -365,67 +372,57 @@ with col2:
                                 "color": vol_color
                             })
                             
-                        # 將 Python 字典轉換為 JavaScript 讀得懂的 JSON 字串
-                        candle_json = json.dumps(candle_data)
-                        volume_json = json.dumps(volume_data)
-                        
-                        # 注入官方 Lightweight Charts 語法 (無版權干擾，無彈窗)
-                        tv_light_html = f"""
-                        <div id="tvchart" style="width: 100%; height: 500px;"></div>
-                        <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-                        <script>
-                            const chartOptions = {{
-                                layout: {{
-                                    textColor: 'white',
-                                    background: {{ type: 'solid', color: '#000000' }}
-                                }},
-                                grid: {{
-                                    vertLines: {{ color: '#1f1f1f' }},
-                                    horzLines: {{ color: '#1f1f1f' }}
-                                }},
-                                crosshair: {{
-                                    mode: LightweightCharts.CrosshairMode.Normal,
-                                }},
-                                rightPriceScale: {{
-                                    borderColor: '#1f1f1f',
-                                }},
-                                timeScale: {{
-                                    borderColor: '#1f1f1f',
-                                }}
-                            }};
+                        # 如果過濾完確定有資料，才開始渲染圖表
+                        if len(candle_data) > 0:
+                            candle_json = json.dumps(candle_data)
+                            volume_json = json.dumps(volume_data)
                             
-                            const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
+                            tv_light_html = f"""
+                            <div id="tvchart" style="width: 100%; height: 500px;"></div>
+                            <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+                            <script>
+                            try {{
+                                const chartOptions = {{
+                                    layout: {{ textColor: 'white', background: {{ type: 'solid', color: '#000000' }} }},
+                                    grid: {{ vertLines: {{ color: '#1f1f1f' }}, horzLines: {{ color: '#1f1f1f' }} }},
+                                    crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+                                    rightPriceScale: {{ borderColor: '#1f1f1f' }},
+                                    timeScale: {{ borderColor: '#1f1f1f' }}
+                                }};
+                                
+                                const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
 
-                            // 設定 K 線的紅漲白跌
-                            const candlestickSeries = chart.addCandlestickSeries({{
-                                upColor: '#ff0000',
-                                downColor: '#ffffff',
-                                borderUpColor: '#ff0000',
-                                borderDownColor: '#ffffff',
-                                wickUpColor: '#ff0000',
-                                wickDownColor: '#ffffff'
-                            }});
-                            candlestickSeries.setData({candle_json});
+                                const candlestickSeries = chart.addCandlestickSeries({{
+                                    upColor: '#ff0000', downColor: '#ffffff',
+                                    borderUpColor: '#ff0000', borderDownColor: '#ffffff',
+                                    wickUpColor: '#ff0000', wickDownColor: '#ffffff'
+                                }});
+                                candlestickSeries.setData({candle_json});
 
-                            // 設定成交量，將其壓在圖表的底部 20%
-                            const volumeSeries = chart.addHistogramSeries({{
-                                priceFormat: {{ type: 'volume' }},
-                                priceScaleId: '', 
-                            }});
-                            chart.priceScale('').applyOptions({{
-                                scaleMargins: {{ top: 0.8, bottom: 0 }},
-                            }});
-                            volumeSeries.setData({volume_json});
-                            
-                            // 自動縮放以適應螢幕寬度
-                            chart.timeScale().fitContent();
-                            
-                            // 監聽視窗大小變化，維持 100% 寬度
-                            window.addEventListener('resize', () => {{
-                                chart.resize(document.getElementById('tvchart').clientWidth, 500);
-                            }});
-                        </script>
-                        """
-                        components.html(tv_light_html, height=500)
+                                const volumeSeries = chart.addHistogramSeries({{
+                                    priceFormat: {{ type: 'volume' }},
+                                    priceScaleId: '', 
+                                }});
+                                
+                                // 修復舊版語法造成的衝突
+                                volumeSeries.priceScale().applyOptions({{
+                                    scaleMargins: {{ top: 0.8, bottom: 0 }},
+                                }});
+                                volumeSeries.setData({volume_json});
+                                
+                                chart.timeScale().fitContent();
+                                
+                                window.addEventListener('resize', () => {{
+                                    chart.resize(document.getElementById('tvchart').clientWidth, 500);
+                                }});
+                            }} catch (e) {{
+                                // 萬一又失敗，把錯誤原因直接印在畫面上，不再是黑盒子！
+                                document.getElementById('tvchart').innerHTML = "<h3 style='color:#ff4444; margin:20px;'>圖表渲染失敗: " + e.message + "<br>請截圖此畫面。</h3>";
+                            }}
+                            </script>
+                            """
+                            components.html(tv_light_html, height=500)
+                        else:
+                            st.warning("⚠️ 該檔股票近半年無有效交易資料。")
                     else:
                         st.error(f"⚠️ 無法取得 {ticker} 的歷史 K 線資料。")
