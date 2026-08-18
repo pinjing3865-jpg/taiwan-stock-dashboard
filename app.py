@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-import yfinance as yf # 🌟 改用國際級 yfinance
+import yfinance as yf
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -80,7 +80,7 @@ my_custom_sectors = {
 
 sector_categories = {
     "📊 半導體族群": ['IC-製造', 'IC-設計', 'IC-封測', 'IC-通路', '矽晶圓', 'DRAM', '二極體'],
-    "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散熱模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
+    "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散抓模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
     "🖥️ 電腦與軟體": ['筆記型電腦', '電腦周邊產品', '板卡', '工業電腦', '軟體-系統整合', '軟體-其他', '軟體-遊戲', '安全監控'],
     "📡 光電與網通": ['光學鏡片', 'LCD面板', 'LCD零件', 'LED及光元件', '顯示器', '光碟片', '網通設備', '低軌衛星'],
     "🚗 車用與軍工": ['車用電子', '汽車零組件', '航天軍工'],
@@ -88,26 +88,79 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
-# 🌟 新增的 yfinance 動態三率引擎 (精準打擊，無懼防火牆)
+# 🌟 進階版 yfinance 動態三率引擎 (含歷史財報比對與三升判定)
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
     margin_data = []
     for ticker in tickers:
         try:
-            # 嘗試抓取上市或上櫃資料
             stock = yf.Ticker(f"{ticker}.TW")
-            info = stock.info
-            if 'grossMargins' not in info or info['grossMargins'] is None:
+            q_fin = stock.quarterly_financials
+            if q_fin.empty:
                 stock = yf.Ticker(f"{ticker}.TWO")
-                info = stock.info
+                q_fin = stock.quarterly_financials
 
-            margin_data.append({
-                '證券代號': str(ticker),
-                '毛利率(%)': round(info.get('grossMargins', 0) * 100, 2) if info.get('grossMargins') else None,
-                '營益率(%)': round(info.get('operatingMargins', 0) * 100, 2) if info.get('operatingMargins') else None,
-                '淨利率(%)': round(info.get('profitMargins', 0) * 100, 2) if info.get('profitMargins') else None,
-            })
-        except:
+            # 如果成功抓到歷史財報且至少有兩季資料
+            if not q_fin.empty and q_fin.shape[1] >= 2:
+                latest = q_fin.iloc[:, 0]
+                prev = q_fin.iloc[:, 1]
+
+                # 防呆尋找對應的會計科目
+                def safe_get(series, keys):
+                    for k in keys:
+                        if k in series.index and pd.notnull(series[k]) and series[k] != 0:
+                            return series[k]
+                    return None
+
+                rev_keys = ['Total Revenue', 'Operating Revenue', 'Revenue']
+                gp_keys = ['Gross Profit']
+                op_keys = ['Operating Income']
+                ni_keys = ['Net Income', 'Net Income Common Stockholders']
+
+                r1, g1, o1, n1 = safe_get(latest, rev_keys), safe_get(latest, gp_keys), safe_get(latest, op_keys), safe_get(latest, ni_keys)
+                r2, g2, o2, n2 = safe_get(prev, rev_keys), safe_get(prev, gp_keys), safe_get(prev, op_keys), safe_get(prev, ni_keys)
+
+                # 計算 最新一季(1) 與 上一季(2) 的三率
+                gm1 = (g1 / r1 * 100) if g1 and r1 else None
+                om1 = (o1 / r1 * 100) if o1 and r1 else None
+                nm1 = (n1 / r1 * 100) if n1 and r1 else None
+
+                gm2 = (g2 / r2 * 100) if g2 and r2 else None
+                om2 = (o2 / r2 * 100) if o2 and r2 else None
+                nm2 = (n2 / r2 * 100) if n2 and r2 else None
+
+                # 格式化輸出字串 (包含增減幅度與視覺箭頭)
+                def format_margin(v1, v2):
+                    if v1 is None: return None
+                    if v2 is None: return f"{v1:.2f}%"
+                    diff = v1 - v2
+                    arrow = "🔺" if diff > 0 else ("🔻" if diff < 0 else "➖")
+                    return f"{v1:.2f}% ({arrow}{diff:+.2f})"
+
+                # 判定是否「三率三升」
+                is_3_up = False
+                if gm1 and gm2 and om1 and om2 and nm1 and nm2:
+                    if (gm1 > gm2) and (om1 > om2) and (nm1 > nm2):
+                        is_3_up = True
+
+                margin_data.append({
+                    '證券代號': str(ticker),
+                    '三率狀態': '🔥 三率三升' if is_3_up else '',
+                    '毛利率(季增減)': format_margin(gm1, gm2),
+                    '營益率(季增減)': format_margin(om1, om2),
+                    '淨利率(季增減)': format_margin(nm1, nm2)
+                })
+            else:
+                # 備用方案：只抓到最新資料
+                info = stock.info
+                margin_data.append({
+                    '證券代號': str(ticker),
+                    '三率狀態': '',
+                    '毛利率(季增減)': f"{round(info.get('grossMargins', 0)*100, 2)}%" if info.get('grossMargins') else None,
+                    '營益率(季增減)': f"{round(info.get('operatingMargins', 0)*100, 2)}%" if info.get('operatingMargins') else None,
+                    '淨利率(季增減)': f"{round(info.get('profitMargins', 0)*100, 2)}%" if info.get('profitMargins') else None
+                })
+        except Exception:
             pass
     return pd.DataFrame(margin_data)
 
@@ -213,8 +266,7 @@ with col2:
             if strong_stocks.empty:
                 st.error("⚠️ 成分股最新營收皆衰退，留意純籌碼炒作。")
             else:
-                # 🌟 這裡就是魔法：只針對選出來的這幾檔強勢股，動態向 yfinance 抓取三率！
-                with st.spinner(f'正在載入 {sector} 的財報三率...'):
+                with st.spinner(f'正在分析 {sector} 財報三率增減幅度...'):
                     tickers = strong_stocks['證券代號'].tolist()
                     margin_df = fetch_margins_via_yf(tuple(tickers))
                     if not margin_df.empty:
@@ -222,7 +274,6 @@ with col2:
 
                 st.success("✅ 具備基本面支援 (營收YoY > 0)")
                 
-                # 動態設定要顯示的欄位
                 display_cols = ["證券代號", "證券名稱", "當月營收", "營收YoY(%)"]
                 
                 if "累計營收YoY(%)" in strong_stocks.columns:
@@ -230,19 +281,22 @@ with col2:
                 elif "累計營收成長率(%)" in strong_stocks.columns:
                     display_cols.append("累計營收成長率(%)")
                     
-                # 確保三率欄位被加入顯示清單
-                for m in ['毛利率(%)', '營益率(%)', '淨利率(%)']:
+                # 🌟 將全新的字串格式三率欄位加入顯示
+                for m in ['三率狀態', '毛利率(季增減)', '營益率(季增減)', '淨利率(季增減)']:
                     if m in strong_stocks.columns:
                         display_cols.append(m)
                 
                 strong_stocks = strong_stocks[display_cols]
                 
+                # 因為三率現在是帶有箭頭符號的字串，所以我們把它從數字格式排版中移除，讓它以原本的字串顯示
                 col_config = {
                     "當月營收": st.column_config.NumberColumn(format="%d"),
                     "營收YoY(%)": st.column_config.NumberColumn(format="%.2f %%")
                 }
-                for extra_col in display_cols[4:]:
-                    col_config[extra_col] = st.column_config.NumberColumn(format="%.2f %%")
+                if "累計營收YoY(%)" in display_cols:
+                    col_config["累計營收YoY(%)"] = st.column_config.NumberColumn(format="%.2f %%")
+                elif "累計營收成長率(%)" in display_cols:
+                    col_config["累計營收成長率(%)"] = st.column_config.NumberColumn(format="%.2f %%")
                 
                 st.dataframe(
                     strong_stocks,
