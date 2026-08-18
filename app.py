@@ -333,8 +333,15 @@ with col2:
                     
                     if not df_kline.empty:
                         df_kline = df_kline.reset_index()
-                        # 將時間轉換為 TradingView 讀得懂的格式
-                        df_kline['Date_str'] = df_kline['Date'].dt.strftime('%Y-%m-%d')
+                        
+                        # 1. 抓出日期欄位 (防呆：yfinance 有時會命名為 Datetime)
+                        date_col = 'Date' if 'Date' in df_kline.columns else ('Datetime' if 'Datetime' in df_kline.columns else df_kline.columns[0])
+                        df_kline['Date_str'] = df_kline[date_col].dt.strftime('%Y-%m-%d')
+                        
+                        # 2. 🛡️ 核心濾水器：把會讓 TradingView 崩潰的髒資料全部清掉！
+                        df_kline = df_kline.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume']) # 殺掉空值
+                        df_kline = df_kline.drop_duplicates(subset=['Date_str']) # 殺掉重複日期
+                        df_kline = df_kline.sort_values('Date_str') # 嚴格依照日期從舊到新排好
                         
                         candle_data = []
                         volume_data = []
@@ -344,16 +351,17 @@ with col2:
                             is_up = row['Close'] >= row['Open']
                             vol_color = "#ff0000" if is_up else "#ffffff"
                             
+                            # 強制轉型為標準 float，避免 json 轉換出錯
                             candle_data.append({
                                 "time": row['Date_str'],
-                                "open": row['Open'],
-                                "high": row['High'],
-                                "low": row['Low'],
-                                "close": row['Close']
+                                "open": float(row['Open']),
+                                "high": float(row['High']),
+                                "low": float(row['Low']),
+                                "close": float(row['Close'])
                             })
                             volume_data.append({
                                 "time": row['Date_str'],
-                                "value": row['Volume'],
+                                "value": float(row['Volume']),
                                 "color": vol_color
                             })
                             
