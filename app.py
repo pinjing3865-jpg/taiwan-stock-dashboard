@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import yfinance as yf # 🌟 改用國際級 yfinance
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
 from mops_revenue_crawler import fetch_latest_monthly_revenue
 from rrg_visualizer import plot_rrg_chart
-from mops_margin_crawler import fetch_financial_margins 
-from twse_market_core import build_history_market_data, generate_sector_dataframes # 🌟 新增的全市場極速引擎
+from twse_market_core import build_history_market_data, generate_sector_dataframes
 
 # ==========================================
 # 網頁基本設定
@@ -88,39 +88,36 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
-@st.cache_data(ttl=3600)
-def get_benchmark_history(days=25):
-    today = datetime.now()
-    date_list = [(today - timedelta(days=x)).strftime("%Y%m%d") for x in range(days)]
-    date_list.reverse()
-    
-    taiex_history = []
-    for date_str in date_list:
-        df = fetch_twse_index_data(date_str)
-        if df is not None:
-            taiex_row = df[df['指數'] == '發行量加權股價指數']
-            if not taiex_row.empty:
-                taiex_history.append({
-                    'Date': taiex_row['Date'].values[0],
-                    'Close': taiex_row['收盤指數'].values[0]
-                })
-        time.sleep(1)
-    return pd.DataFrame(taiex_history)
+# 🌟 新增的 yfinance 動態三率引擎 (精準打擊，無懼防火牆)
+@st.cache_data(ttl=86400)
+def fetch_margins_via_yf(tickers):
+    margin_data = []
+    for ticker in tickers:
+        try:
+            # 嘗試抓取上市或上櫃資料
+            stock = yf.Ticker(f"{ticker}.TW")
+            info = stock.info
+            if 'grossMargins' not in info or info['grossMargins'] is None:
+                stock = yf.Ticker(f"{ticker}.TWO")
+                info = stock.info
+
+            margin_data.append({
+                '證券代號': str(ticker),
+                '毛利率(%)': round(info.get('grossMargins', 0) * 100, 2) if info.get('grossMargins') else None,
+                '營益率(%)': round(info.get('operatingMargins', 0) * 100, 2) if info.get('operatingMargins') else None,
+                '淨利率(%)': round(info.get('profitMargins', 0) * 100, 2) if info.get('profitMargins') else None,
+            })
+        except:
+            pass
+    return pd.DataFrame(margin_data)
 
 @st.cache_data(ttl=3600)
 def get_all_data(selected_sectors):
-    # 1. 抓取營收與三率
     revenue_df = fetch_latest_monthly_revenue()
-    margin_df = fetch_financial_margins()
-    
-    # 2. 獲取全市場歷史快取包 (耗時動作集中在此，但會顯示進度條，且有快取)
     df_taiex, market_stocks_data = build_history_market_data(trading_days=25)
-    
-    # 3. 瞬間組裝使用者勾選的產業 (0.1秒完成)
     target_dict = {k: my_custom_sectors[k] for k in selected_sectors if k in my_custom_sectors}
     sector_dataframes = generate_sector_dataframes(market_stocks_data, target_dict)
-    
-    return revenue_df, margin_df, df_taiex, sector_dataframes
+    return revenue_df, df_taiex, sector_dataframes
 
 # ==========================================
 # 側邊欄控制台
@@ -156,8 +153,8 @@ if not selected_sectors:
     st.warning("⚠️ 請從左側側邊欄至少勾選一個細產業！")
     st.stop()
 
-with st.spinner('正在同步全市場成分股、最新月營收與財報三率資料中...'):
-    revenue_df, margin_df, df_taiex, sector_dataframes = get_all_data(tuple(selected_sectors))
+with st.spinner('正在同步全市場成分股與最新月營收資料中...'):
+    revenue_df, df_taiex, sector_dataframes = get_all_data(tuple(selected_sectors))
 
 if revenue_df is None or df_taiex.empty:
     st.error("資料載入失敗，請確認網路連線。")
@@ -211,35 +208,35 @@ with col2:
                 
             # 挑出營收成長的強勢股
             strong_stocks = sector_revenue[sector_revenue['營收YoY(%)'] > 0].copy()
-            
-            # 🌟 將財報三率合併進來
-            if not margin_df.empty:
-                strong_stocks = pd.merge(strong_stocks, margin_df, on='證券代號', how='left')
-                
             strong_stocks = strong_stocks.sort_values('營收YoY(%)', ascending=False)
             
             if strong_stocks.empty:
                 st.error("⚠️ 成分股最新營收皆衰退，留意純籌碼炒作。")
             else:
+                # 🌟 這裡就是魔法：只針對選出來的這幾檔強勢股，動態向 yfinance 抓取三率！
+                with st.spinner(f'正在載入 {sector} 的財報三率...'):
+                    tickers = strong_stocks['證券代號'].tolist()
+                    margin_df = fetch_margins_via_yf(tuple(tickers))
+                    if not margin_df.empty:
+                        strong_stocks = pd.merge(strong_stocks, margin_df, on='證券代號', how='left')
+
                 st.success("✅ 具備基本面支援 (營收YoY > 0)")
                 
-                # 🌟 動態設定要顯示的防呆欄位
+                # 動態設定要顯示的欄位
                 display_cols = ["證券代號", "證券名稱", "當月營收", "營收YoY(%)"]
                 
-                # 自動判斷是否有累計營收(年營收率)
                 if "累計營收YoY(%)" in strong_stocks.columns:
                     display_cols.append("累計營收YoY(%)")
                 elif "累計營收成長率(%)" in strong_stocks.columns:
                     display_cols.append("累計營收成長率(%)")
                     
-                # 加入三率
+                # 確保三率欄位被加入顯示清單
                 for m in ['毛利率(%)', '營益率(%)', '淨利率(%)']:
                     if m in strong_stocks.columns:
                         display_cols.append(m)
                 
                 strong_stocks = strong_stocks[display_cols]
                 
-                # 🌟 統一設定百分比格式
                 col_config = {
                     "當月營收": st.column_config.NumberColumn(format="%d"),
                     "營收YoY(%)": st.column_config.NumberColumn(format="%.2f %%")
@@ -253,5 +250,3 @@ with col2:
                     hide_index=True,
                     use_container_width=True
                 )
-
-                
