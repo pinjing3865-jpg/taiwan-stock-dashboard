@@ -19,9 +19,10 @@ from twse_market_core import build_history_market_data, generate_sector_datafram
 st.set_page_config(page_title="台股全市場完整成分股戰情室", layout="wide", page_icon="📈")
 
 # ==========================================
-# 完整成分股細產業與粗分類字典
+# 完整成分股細產業與粗分類字典 (已新增 CPO 與矽光子專區)
 # ==========================================
 my_custom_sectors = {
+    'CPO與矽光子': ['2330', '3363', '3163', '4979', '3450', '3081', '6442', '4908', '3711', '2455'],
     'PCB-製造': ['2368', '3037', '2313', '4958', '6274', '5381', '3044', '5469', '6213', '8046', '6292', '5349'],
     'PCB-材料設備': ['6213', '8046', '3189', '5340', '4721', '6552', '4767', '1815'],
     '光學鏡片': ['3008', '3406', '3362', '3019', '3441', '3504', '3630', '4976', '6209'],
@@ -82,6 +83,7 @@ my_custom_sectors = {
 }
 
 sector_categories = {
+    "💡 CPO與矽光子": ['CPO與矽光子'],
     "📊 半導體族群": ['IC-製造', 'IC-設計', 'IC-封測', 'IC-通路', '矽晶圓', 'DRAM', '二極體'],
     "🔌 電子零組件": ['PCB-製造', 'PCB-材料設備', '被動元件', '連接元件', '電子零組件', '散熱模組', '電源供應器', '變壓器與UPS', '電池', '儀器設備工程'],
     "🖥️ 電腦與軟體": ['筆記型電腦', '電腦周邊產品', '板卡', '工業電腦', '軟體-系統整合', '軟體-其他', '軟體-遊戲', '安全監控'],
@@ -214,7 +216,6 @@ def fetch_margins_via_yf(tickers):
 @st.cache_data(ttl=3600)
 def get_all_data(selected_sectors):
     revenue_df = fetch_latest_monthly_revenue()
-    # 🌟 參數 1：將歷史市場資料天數拉長至 60 天，提供平滑化計算基礎
     df_taiex, market_stocks_data = build_history_market_data(trading_days=60)
     target_dict = {k: my_custom_sectors[k] for k in selected_sectors if k in my_custom_sectors}
     sector_dataframes = generate_sector_dataframes(market_stocks_data, target_dict)
@@ -268,7 +269,6 @@ for sector_name, df_sector in sector_dataframes.items():
     if df_sector is None or df_sector.empty or 'Close' not in df_sector.columns:
         continue
         
-    # 🌟 參數 2：將 RRG 動能計算週期從 5 天拉長至 15 天，過濾單日雜訊，實現波段趨勢平滑化
     rrg_result = calculate_rrg_quadrants(df_sector, df_taiex, period=15)
     if rrg_result is None or rrg_result.empty:
         continue
@@ -344,7 +344,6 @@ with col2:
                 elif "累計營收成長率(%)" in display_cols:
                     col_config["累計營收成長率(%)"] = st.column_config.NumberColumn(format="%.2f %%")
                 
-                # 啟動可點擊連動的表格
                 event = st.dataframe(
                     strong_stocks,
                     column_config=col_config,
@@ -354,9 +353,6 @@ with col2:
                     selection_mode="single-row" 
                 )
                 
-                # ==========================================
-                # 🌟 Python 原生頂級技術分析面板 (四層子圖表)
-                # ==========================================
                 st.markdown("---")
                 
                 col_title, col_tf = st.columns([2, 1])
@@ -386,26 +382,21 @@ with col2:
                         
                         colors = ['#ff0000' if row['Close'] >= row['Open'] else '#ffffff' for i, row in df_kline.iterrows()]
                         
-                        # 1. 主圖：K線
                         fig.add_trace(go.Candlestick(
                             x=df_kline['Date_str'], open=df_kline['Open'], high=df_kline['High'], low=df_kline['Low'], close=df_kline['Close'],
                             name="K線", increasing_line_color='#ff0000', increasing_fillcolor='#ff0000', decreasing_line_color='#ffffff', decreasing_fillcolor='#ffffff'
                         ), row=1, col=1)
                         
-                        # 1-1. 主圖：均線 MA5, MA20
                         fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MA5'], name='MA5', line=dict(color='#2962FF', width=1.5)), row=1, col=1)
                         fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MA20'], name='MA20', line=dict(color='#FFD600', width=1.5)), row=1, col=1)
 
-                        # 2. 副圖：成交量
                         fig.add_trace(go.Bar(x=df_kline['Date_str'], y=df_kline['Volume'], name="成交量", marker_color=colors), row=2, col=1)
 
-                        # 3. 副圖：MACD
                         fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MACD'], name='MACD', line=dict(color='#00E676', width=1.5)), row=3, col=1)
                         fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['MACD_Signal'], name='Signal', line=dict(color='#FF1744', width=1.5)), row=3, col=1)
                         macd_colors = ['#ff0000' if val > 0 else '#ffffff' for val in df_kline['MACD_Hist']]
                         fig.add_trace(go.Bar(x=df_kline['Date_str'], y=df_kline['MACD_Hist'], name='Histogram', marker_color=macd_colors), row=3, col=1)
 
-                        # 4. 副圖：RSI
                         fig.add_trace(go.Scatter(x=df_kline['Date_str'], y=df_kline['RSI'], name='RSI', line=dict(color='#E040FB', width=1.5)), row=4, col=1)
                         fig.add_hline(y=70, line_dash="dash", line_color="gray", row=4, col=1)
                         fig.add_hline(y=30, line_dash="dash", line_color="gray", row=4, col=1)
