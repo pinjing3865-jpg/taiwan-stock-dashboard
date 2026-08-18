@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
+import json # 🌟 新增：用於將資料轉換給 TradingView
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -88,6 +89,18 @@ sector_categories = {
     "🏗️ 傳統產業": ['航運', '鋼鐵', '塑膠', '電機', '化學工業', '營建', '水泥', '玻璃陶瓷', '紙業', '紡織纖維'],
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
+
+@st.cache_data(ttl=3600)
+def get_stock_kline(ticker):
+    try:
+        stock = yf.Ticker(f"{ticker}.TW")
+        df = stock.history(period="6mo")
+        if df.empty:
+            stock = yf.Ticker(f"{ticker}.TWO")
+            df = stock.history(period="6mo")
+        return df
+    except:
+        return pd.DataFrame()
 
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
@@ -289,7 +302,7 @@ with col2:
                 elif "累計營收成長率(%)" in display_cols:
                     col_config["累計營收成長率(%)"] = st.column_config.NumberColumn(format="%.2f %%")
                 
-                # 🌟 啟動可點擊連動的表格
+                # 啟動可點擊連動的表格
                 event = st.dataframe(
                     strong_stocks,
                     column_config=col_config,
@@ -300,10 +313,10 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 TradingView 動態 K 線圖 (由上方表格點擊驅動)
+                # 🌟 TradingView Lightweight Charts (官方輕量版開發引擎)
                 # ==========================================
                 st.markdown("---")
-                st.subheader("📈 個股技術線圖 (點擊上方表格列自動連動)")
+                st.subheader("📈 個股技術線圖 (TradingView 核心引擎驅動)")
                 
                 if event.selection.rows:
                     selected_idx = event.selection.rows[0]
@@ -314,44 +327,97 @@ with col2:
                     name = strong_stocks.iloc[0]['證券名稱']
                 
                 st.info(f"📌 目前顯示線圖：**{ticker} {name}** (請直接點擊上方表格內的任意列來切換)")
-                st.caption("💡 小提示：若圖表顯示 Invalid Symbol，代表該股為上櫃股票。請點擊圖表左上角的放大鏡，將前綴 TWSE 改為 TPEX 即可。")
                 
-                tv_html = f"""
-                <div class="tradingview-widget-container">
-                  <div id="tradingview_{ticker}"></div>
-                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                  <script type="text/javascript">
-                  new TradingView.widget(
-                  {{
-                  "width": "100%",
-                  "height": 550,
-                  "symbol": "TWSE:{ticker}",
-                  "interval": "D",
-                  "timezone": "Asia/Taipei",
-                  "theme": "dark",
-                  "style": "1",
-                  "locale": "zh_TW",
-                  "enable_publishing": false,
-                  "backgroundColor": "#000000",
-                  "gridColor": "#1f1f1f",
-                  "hide_top_toolbar": false,
-                  "hide_legend": false,
-                  "save_image": false,
-                  "container_id": "tradingview_{ticker}",
-                  "studies": [
-                    "Volume@tv-basicstudies"
-                  ],
-                  "overrides": {{
-                      "mainSeriesProperties.candleStyle.upColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.downColor": "#ffffff",
-                      "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
-                      "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
-                      "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
-                  }}
-                  }}
-                  );
-                  </script>
-                </div>
-                """
-                components.html(tv_html, height=550)
+                with st.spinner(f'正在載入 {ticker} {name} 的 TradingView 線圖...'):
+                    df_kline = get_stock_kline(ticker)
+                    
+                    if not df_kline.empty:
+                        df_kline = df_kline.reset_index()
+                        # 將時間轉換為 TradingView 讀得懂的格式
+                        df_kline['Date_str'] = df_kline['Date'].dt.strftime('%Y-%m-%d')
+                        
+                        candle_data = []
+                        volume_data = []
+                        
+                        for _, row in df_kline.iterrows():
+                            # 判斷漲跌以決定成交量的顏色 (紅是漲白是跌)
+                            is_up = row['Close'] >= row['Open']
+                            vol_color = "#ff0000" if is_up else "#ffffff"
+                            
+                            candle_data.append({
+                                "time": row['Date_str'],
+                                "open": row['Open'],
+                                "high": row['High'],
+                                "low": row['Low'],
+                                "close": row['Close']
+                            })
+                            volume_data.append({
+                                "time": row['Date_str'],
+                                "value": row['Volume'],
+                                "color": vol_color
+                            })
+                            
+                        # 將 Python 字典轉換為 JavaScript 讀得懂的 JSON 字串
+                        candle_json = json.dumps(candle_data)
+                        volume_json = json.dumps(volume_data)
+                        
+                        # 注入官方 Lightweight Charts 語法 (無版權干擾，無彈窗)
+                        tv_light_html = f"""
+                        <div id="tvchart" style="width: 100%; height: 500px;"></div>
+                        <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+                        <script>
+                            const chartOptions = {{
+                                layout: {{
+                                    textColor: 'white',
+                                    background: {{ type: 'solid', color: '#000000' }}
+                                }},
+                                grid: {{
+                                    vertLines: {{ color: '#1f1f1f' }},
+                                    horzLines: {{ color: '#1f1f1f' }}
+                                }},
+                                crosshair: {{
+                                    mode: LightweightCharts.CrosshairMode.Normal,
+                                }},
+                                rightPriceScale: {{
+                                    borderColor: '#1f1f1f',
+                                }},
+                                timeScale: {{
+                                    borderColor: '#1f1f1f',
+                                }}
+                            }};
+                            
+                            const chart = LightweightCharts.createChart(document.getElementById('tvchart'), chartOptions);
+
+                            // 設定 K 線的紅漲白跌
+                            const candlestickSeries = chart.addCandlestickSeries({{
+                                upColor: '#ff0000',
+                                downColor: '#ffffff',
+                                borderUpColor: '#ff0000',
+                                borderDownColor: '#ffffff',
+                                wickUpColor: '#ff0000',
+                                wickDownColor: '#ffffff'
+                            }});
+                            candlestickSeries.setData({candle_json});
+
+                            // 設定成交量，將其壓在圖表的底部 20%
+                            const volumeSeries = chart.addHistogramSeries({{
+                                priceFormat: {{ type: 'volume' }},
+                                priceScaleId: '', 
+                            }});
+                            chart.priceScale('').applyOptions({{
+                                scaleMargins: {{ top: 0.8, bottom: 0 }},
+                            }});
+                            volumeSeries.setData({volume_json});
+                            
+                            // 自動縮放以適應螢幕寬度
+                            chart.timeScale().fitContent();
+                            
+                            // 監聽視窗大小變化，維持 100% 寬度
+                            window.addEventListener('resize', () => {{
+                                chart.resize(document.getElementById('tvchart').clientWidth, 500);
+                            }});
+                        </script>
+                        """
+                        components.html(tv_light_html, height=500)
+                    else:
+                        st.error(f"⚠️ 無法取得 {ticker} 的歷史 K 線資料。")
