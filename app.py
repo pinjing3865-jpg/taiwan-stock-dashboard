@@ -300,7 +300,8 @@ with col1:
     st.subheader("📊 RRG 動能旋轉圖 (波段平滑化過濾雜訊)")
     if rrg_all_history:
         fig = plot_rrg_chart(rrg_all_history)
-        st.pyplot(fig)
+        # 🌟 加上 use_container_width=True 讓圖表自動適應左側欄位大小
+        st.pyplot(fig, use_container_width=True) 
     else:
         st.warning("⚠️ 目前尚無足夠的 RRG 歷史數據可供繪圖。")
 
