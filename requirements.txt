@@ -5,3 +5,4 @@ matplotlib
 html5lib
 lxml
 tabulate
+yfinance
