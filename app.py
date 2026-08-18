@@ -89,6 +89,18 @@ sector_categories = {
     "💼 生技金融與其他": ['生技', '金融-證券', '金融-金控', '控股公司', '電信服務', '綠能環保', '運動', '運動休閒', '居家生活', '家居', '電子-其他']
 }
 
+# 🌟 新增：自動探測是上市還是上櫃的函數
+@st.cache_data(ttl=86400)
+def get_tradingview_exchange(ticker):
+    try:
+        # 敲敲上市的門，如果有資料就是 TWSE
+        if not yf.Ticker(f"{ticker}.TW").history(period="1d").empty:
+            return "TWSE"
+    except:
+        pass
+    # 否則就是上櫃 TPEX
+    return "TPEX"
+
 @st.cache_data(ttl=86400)
 def fetch_margins_via_yf(tickers):
     margin_data = []
@@ -300,7 +312,7 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 TradingView 原廠滿血版 (結合傳送門按鈕)
+                # 🌟 TradingView 原廠滿血版 (結合自動判斷與一鍵傳送門)
                 # ==========================================
                 st.markdown("---")
                 st.subheader("📈 個股技術線圖 (TradingView 完整功能版)")
@@ -313,17 +325,17 @@ with col2:
                     ticker = str(strong_stocks.iloc[0]['證券代號'])
                     name = strong_stocks.iloc[0]['證券名稱']
                 
-                st.info(f"📌 目前選擇：**{ticker} {name}** (請直接點擊上方表格內的任意列來切換)")
+                # 🌟 自動判斷這檔股票是上市(TWSE)還是上櫃(TPEX)
+                tv_exchange = get_tradingview_exchange(ticker)
+                tv_symbol = f"{tv_exchange}:{ticker}"
                 
-                # 🌟 加入傳送門按鈕，萬一跳出彈窗，可以一鍵前往無干擾的官網！
+                st.info(f"📌 目前選擇：**{ticker} {name}** (市場別：{tv_exchange})")
                 st.caption("💡 說明：因版權限制，下方圖表若跳出阻擋視窗，請直接點擊下方按鈕前往官網使用完整指標！")
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    st.link_button(f"🚀 前往 TradingView 查看【{ticker} {name}】(上市)", f"https://www.tradingview.com/chart/?symbol=TWSE:{ticker}", use_container_width=True)
-                with col_btn2:
-                    st.link_button(f"🚀 前往 TradingView 查看【{ticker} {name}】(上櫃)", f"https://www.tradingview.com/chart/?symbol=TPEX:{ticker}", use_container_width=True)
                 
-                # 嵌入原廠 Advanced Widget，並維持紅漲白跌設定
+                # 🌟 合併成一顆智慧導航按鈕
+                st.link_button(f"🚀 前往 TradingView 官網查看【{ticker} {name}】完整圖表", f"https://www.tradingview.com/chart/?symbol={tv_symbol}", use_container_width=True)
+                
+                # 嵌入原廠 Advanced Widget，動態帶入正確的上市櫃前綴
                 tv_html = f"""
                 <div class="tradingview-widget-container">
                   <div id="tradingview_{ticker}"></div>
@@ -333,7 +345,7 @@ with col2:
                   {{
                   "width": "100%",
                   "height": 600,
-                  "symbol": "TWSE:{ticker}",
+                  "symbol": "{tv_symbol}",
                   "interval": "D",
                   "timezone": "Asia/Taipei",
                   "theme": "dark",
