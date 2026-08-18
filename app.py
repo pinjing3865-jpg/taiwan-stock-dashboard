@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components # 🌟 新增：用於嵌入 TradingView 網頁元件
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -289,68 +289,69 @@ with col2:
                 elif "累計營收成長率(%)" in display_cols:
                     col_config["累計營收成長率(%)"] = st.column_config.NumberColumn(format="%.2f %%")
                 
-                st.dataframe(
+                # 🌟 啟動可點擊連動的表格
+                event = st.dataframe(
                     strong_stocks,
                     column_config=col_config,
                     hide_index=True,
-                    use_container_width=True
+                    use_container_width=True,
+                    on_select="rerun",          
+                    selection_mode="single-row" 
                 )
                 
                 # ==========================================
-                # 🌟 新增：TradingView 動態 K 線圖嵌入區塊
+                # 🌟 TradingView 動態 K 線圖 (由上方表格點擊驅動)
                 # ==========================================
                 st.markdown("---")
-                st.subheader("📈 個股技術線圖 (TradingView即時連動)")
+                st.subheader("📈 個股技術線圖 (點擊上方表格列自動連動)")
                 
-                # 建立下拉式選單，讓使用者從上方選出的強勢股中直接挑選
-                stock_options = strong_stocks['證券代號'].astype(str) + " " + strong_stocks['證券名稱']
-                selected_stock = st.selectbox(f"請選擇要查看線圖的【{sector}】成分股：", stock_options.tolist(), key=f"tv_select_{sector}")
+                if event.selection.rows:
+                    selected_idx = event.selection.rows[0]
+                    ticker = str(strong_stocks.iloc[selected_idx]['證券代號'])
+                    name = strong_stocks.iloc[selected_idx]['證券名稱']
+                else:
+                    ticker = str(strong_stocks.iloc[0]['證券代號'])
+                    name = strong_stocks.iloc[0]['證券名稱']
                 
-                if selected_stock:
-                    # 取出股票代號
-                    ticker = selected_stock.split(" ")[0]
-                    
-                    # 提示文字 (萬一遇到上櫃股票，可引導使用者手動修改)
-                    st.caption("💡 小提示：若圖表顯示 Invalid Symbol，請點擊圖表左上角的放大鏡，手動將 TWSE 改為 TPEX 即可。")
-                    
-                    # 建立 TradingView 專屬 HTML 語法，注入「紅漲白跌」配色設定
-                    tv_html = f"""
-                    <div class="tradingview-widget-container">
-                      <div id="tradingview_{ticker}"></div>
-                      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                      <script type="text/javascript">
-                      new TradingView.widget(
-                      {{
-                      "width": "100%",
-                      "height": 550,
-                      "symbol": "TWSE:{ticker}",
-                      "interval": "D",
-                      "timezone": "Asia/Taipei",
-                      "theme": "dark",
-                      "style": "1",
-                      "locale": "zh_TW",
-                      "enable_publishing": false,
-                      "backgroundColor": "#000000",
-                      "gridColor": "#1f1f1f",
-                      "hide_top_toolbar": false,
-                      "hide_legend": false,
-                      "save_image": false,
-                      "container_id": "tradingview_{ticker}",
-                      "studies": [
-                        "Volume@tv-basicstudies"
-                      ],
-                      "overrides": {{
-                          "mainSeriesProperties.candleStyle.upColor": "#ff0000",
-                          "mainSeriesProperties.candleStyle.downColor": "#ffffff",
-                          "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
-                          "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
-                          "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
-                          "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
-                      }}
-                      }}
-                      );
-                      </script>
-                    </div>
-                    """
-                    # 使用 streamlit.components 將 HTML 渲染出來
-                    components.html(tv_html, height=550)
+                st.info(f"📌 目前顯示線圖：**{ticker} {name}** (請直接點擊上方表格內的任意列來切換)")
+                st.caption("💡 小提示：若圖表顯示 Invalid Symbol，代表該股為上櫃股票。請點擊圖表左上角的放大鏡，將前綴 TWSE 改為 TPEX 即可。")
+                
+                tv_html = f"""
+                <div class="tradingview-widget-container">
+                  <div id="tradingview_{ticker}"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                  <script type="text/javascript">
+                  new TradingView.widget(
+                  {{
+                  "width": "100%",
+                  "height": 550,
+                  "symbol": "TWSE:{ticker}",
+                  "interval": "D",
+                  "timezone": "Asia/Taipei",
+                  "theme": "dark",
+                  "style": "1",
+                  "locale": "zh_TW",
+                  "enable_publishing": false,
+                  "backgroundColor": "#000000",
+                  "gridColor": "#1f1f1f",
+                  "hide_top_toolbar": false,
+                  "hide_legend": false,
+                  "save_image": false,
+                  "container_id": "tradingview_{ticker}",
+                  "studies": [
+                    "Volume@tv-basicstudies"
+                  ],
+                  "overrides": {{
+                      "mainSeriesProperties.candleStyle.upColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.downColor": "#ffffff",
+                      "mainSeriesProperties.candleStyle.borderUpColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.borderDownColor": "#ffffff",
+                      "mainSeriesProperties.candleStyle.wickUpColor": "#ff0000",
+                      "mainSeriesProperties.candleStyle.wickDownColor": "#ffffff"
+                  }}
+                  }}
+                  );
+                  </script>
+                </div>
+                """
+                components.html(tv_html, height=550)
