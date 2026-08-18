@@ -93,12 +93,10 @@ sector_categories = {
 @st.cache_data(ttl=86400)
 def get_tradingview_exchange(ticker):
     try:
-        # 敲敲上市的門，如果有資料就是 TWSE
         if not yf.Ticker(f"{ticker}.TW").history(period="1d").empty:
             return "TWSE"
     except:
         pass
-    # 否則就是上櫃 TPEX
     return "TPEX"
 
 @st.cache_data(ttl=86400)
@@ -312,33 +310,37 @@ with col2:
                 )
                 
                 # ==========================================
-                # 🌟 TradingView 原廠滿血版 (結合自動判斷與一鍵傳送門)
+                # 🌟 TradingView 原廠滿血版 (防空白污染 + 動態 ID 防快取)
                 # ==========================================
                 st.markdown("---")
                 st.subheader("📈 個股技術線圖 (TradingView 完整功能版)")
                 
                 if event.selection.rows:
                     selected_idx = event.selection.rows[0]
-                    ticker = str(strong_stocks.iloc[selected_idx]['證券代號'])
-                    name = strong_stocks.iloc[selected_idx]['證券名稱']
+                    # 🌟 魔法防線：加上 .strip() 把看不見的空白全部砍掉！
+                    ticker = str(strong_stocks.iloc[selected_idx]['證券代號']).strip()
+                    name = str(strong_stocks.iloc[selected_idx]['證券名稱']).strip()
                 else:
-                    ticker = str(strong_stocks.iloc[0]['證券代號'])
-                    name = strong_stocks.iloc[0]['證券名稱']
+                    ticker = str(strong_stocks.iloc[0]['證券代號']).strip()
+                    name = str(strong_stocks.iloc[0]['證券名稱']).strip()
                 
-                # 🌟 自動判斷這檔股票是上市(TWSE)還是上櫃(TPEX)
+                # 自動判斷這檔股票是上市(TWSE)還是上櫃(TPEX)
                 tv_exchange = get_tradingview_exchange(ticker)
                 tv_symbol = f"{tv_exchange}:{ticker}"
+                
+                # 🌟 動態生成獨一無二的 Container ID，強迫 Streamlit 與瀏覽器不要拿舊圖表來敷衍我們
+                unique_container_id = f"tv_{ticker}_{int(time.time() * 1000)}"
                 
                 st.info(f"📌 目前選擇：**{ticker} {name}** (市場別：{tv_exchange})")
                 st.caption("💡 說明：因版權限制，下方圖表若跳出阻擋視窗，請直接點擊下方按鈕前往官網使用完整指標！")
                 
-                # 🌟 合併成一顆智慧導航按鈕
+                # 精準導航按鈕
                 st.link_button(f"🚀 前往 TradingView 官網查看【{ticker} {name}】完整圖表", f"https://www.tradingview.com/chart/?symbol={tv_symbol}", use_container_width=True)
                 
-                # 嵌入原廠 Advanced Widget，動態帶入正確的上市櫃前綴
+                # 嵌入原廠 Advanced Widget，並帶入去空白的 tv_symbol 與獨一無二的 unique_container_id
                 tv_html = f"""
                 <div class="tradingview-widget-container">
-                  <div id="tradingview_{ticker}"></div>
+                  <div id="{unique_container_id}"></div>
                   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
                   <script type="text/javascript">
                   new TradingView.widget(
@@ -357,7 +359,7 @@ with col2:
                   "hide_top_toolbar": false,
                   "hide_legend": false,
                   "save_image": false,
-                  "container_id": "tradingview_{ticker}",
+                  "container_id": "{unique_container_id}",
                   "studies": [
                     "Volume@tv-basicstudies",
                     "MASimple@tv-basicstudies"
