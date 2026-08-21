@@ -423,8 +423,11 @@ with col1:
             df_metrics = st.session_state.historical_metrics
 
         except Exception as e:
-            df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
+            # 💡 把這行加進去，讓隱藏的錯誤顯示在畫面上！
+            st.error(f"🛑 抓蟲雷達：{repr(e)}") 
             
+            df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
+
         if not df_metrics.empty:
             # 💡 呼叫全新的「帶軌跡版本」繪圖函式
             if 'date' in df_metrics.columns:
