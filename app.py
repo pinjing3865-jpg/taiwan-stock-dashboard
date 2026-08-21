@@ -361,54 +361,41 @@ with col1:
             #     st.warning(f"⚠️ API 連線提示: {e}")
             pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
 
-      # 🚀 實戰模式：抓取真實 API 數據並計算大戶籌碼指標
+     # 🚀 實戰模式：抓取真實 API 數據並累積歷史記憶
         try:
-            # 1. 抓取原始 Tick 數據
+            # 1. 抓取當日原始 Tick
             raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks, threshold=threshold_slider * 10000)
             
             if not raw_ticks.empty:
-                # 2. 依照代碼分組，計算 X 軸（大戶買賣比）與 Y 軸（大戶淨差比）
-                metrics_list = []
+                # 2. 計算今日指標 (與剛才相同)
+                today_metrics = []
                 for code in sector_stocks:
                     df_stock = raw_ticks[raw_ticks['code'] == str(code)]
-                    if df_stock.empty:
-                        continue
+                    if df_stock.empty: continue
                     
-                    # 取得中文股名
-                    try:
-                        name = sj_api.Contracts.Stocks[str(code)].name
-                    except:
-                        name = str(code)
-                    
-                    # 計算大戶買入與賣出總金額
-                    buy_df = df_stock[df_stock['action'] == 'B']
-                    sell_df = df_stock[df_stock['action'] == 'S']
-                    
-                    buy_amt = buy_df['amount'].sum() if not buy_df.empty else 0
-                    sell_amt = sell_df['amount'].sum() if not sell_df.empty else 0
-                    total_amt = buy_amt + sell_amt
-                    
-                    # 計算 X 軸：大戶買賣比率 (買入佔總成交的百分比)
-                    buy_sell_ratio = (buy_amt / total_amt * 100) if total_amt > 0 else 50.0
-                    
-                    # 計算 Y 軸：大戶淨差異比 ((買 - 賣) / 總成交)
-                    net_diff_ratio = ((buy_amt - sell_amt) / total_amt * 100) if total_amt > 0 else 0.0
-                    
-                    metrics_list.append({
-                        'code': str(code),
-                        'name': name,
-                        'date': datetime.today().strftime("%Y-%m-%d"),
-                        'buy_sell_ratio': round(buy_sell_ratio, 2),
-                        'net_diff_ratio': round(net_diff_ratio, 2),
-                        'total_amount': total_amt
-                    })
+                    # 計算邏輯... (保留你剛才寫的那段 buy_amt, sell_amt 計算)
+                    # ... (略)
+                    today_metrics.append({ ... }) # 確保格式相同
+
+                # 3. 建立歷史記憶 (關鍵步驟)
+                if 'historical_metrics' not in st.session_state:
+                    st.session_state.historical_metrics = pd.DataFrame()
                 
-                df_metrics = pd.DataFrame(metrics_list)
+                # 將今日新數據合併進歷史資料庫
+                new_df = pd.DataFrame(today_metrics)
+                st.session_state.historical_metrics = pd.concat([st.session_state.historical_metrics, new_df], ignore_index=True)
+                
+                # 4. 限制歷史紀錄長度 (例如只保留最近 5 天，避免無限膨脹)
+                if len(st.session_state.historical_metrics['date'].unique()) > 5:
+                    oldest_date = sorted(st.session_state.historical_metrics['date'].unique())[0]
+                    st.session_state.historical_metrics = st.session_state.historical_metrics[st.session_state.historical_metrics['date'] != oldest_date]
+                
+                df_metrics = st.session_state.historical_metrics
             else:
                 df_metrics = pd.DataFrame()
                 
         except Exception as e:
-            st.warning(f"⚠️ 真實 API 數據計算中斷：{e}")
+            st.warning(f"⚠️ 數據抓取或軌跡合成中斷：{e}")
             df_metrics = pd.DataFrame()
             
             for code in sector_stocks:
