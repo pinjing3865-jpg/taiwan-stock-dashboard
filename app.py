@@ -393,11 +393,10 @@ with col1:
                 df_metrics = st.session_state.historical_metrics
             else:
                 df_metrics = pd.DataFrame()
-                
-       except Exception as e:
-            # 印出詳細錯誤以便我們看清到底是哪一行出事
+               
+        except Exception as e:  # 👈 這裡的 e 必須跟上面的 t 在同一條垂直線上！
             st.warning(f"⚠️ 數據抓取或軌跡合成中斷，詳細原因：{repr(e)}")
-            df_metrics = pd.DataFrame()
+            df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
   
         if not df_metrics.empty:
             # 💡 呼叫全新的「帶軌跡版本」繪圖函式
