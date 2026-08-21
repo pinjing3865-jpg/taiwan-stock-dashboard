@@ -144,7 +144,7 @@ def plot_xq_chip_rotation_chart(df_metrics, title="大戶籌碼熱門股輪動�
         ),
         textfont=dict(color='white', size=12)
     ))
-    
+
     # 4. 象限文字標籤 (調整顏色以符合黑底)
     fig.add_annotation(x=85, y=30, text="<b>領先區 [強勢主流]</b>", showarrow=False, font=dict(color="#00FF66", size=14))
     fig.add_annotation(x=35, y=30, text="<b>改善區 [潛力啟動]</b>", showarrow=False, font=dict(color="#00BFFF", size=14))
@@ -183,12 +183,19 @@ def plot_xq_chip_rotation_with_trajectory(df_history, title="大戶籌碼熱門�
     fig.add_shape(type="line", x0=0, y0=20, x1=100, y1=20, line=dict(color="rgba(200, 200, 200, 0.3)", width=1, dash="dash"))
 
     # 3. 按照股票代碼分組繪製軌跡
-    for code, group in df_history.groupby('code'):
+    import plotly.express as px
+    # 使用包含 24 種高辨識度顏色的色票，避免股票太多顏色重複
+    color_palette = px.colors.qualitative.Light24 
+    
+    for i, (code, group) in enumerate(df_history.groupby('code')):
         group = group.sort_values('date', ascending=True)
         name = group['name'].iloc[0]
         
         text_labels = [None] * (len(group) - 1) + [f"{code} {name}"]
         marker_sizes = [6] * (len(group) - 1) + [14]
+        
+        # 依照迴圈順序，給這檔股票分配一個專屬顏色
+        stock_color = color_palette[i % len(color_palette)]
         
         fig.add_trace(go.Scatter(
             x=group['buy_sell_ratio'],
@@ -197,32 +204,19 @@ def plot_xq_chip_rotation_with_trajectory(df_history, title="大戶籌碼熱門�
             name=f"{code} {name}",
             text=text_labels,
             textposition="top center",
-            line=dict(width=2, color='rgba(200, 200, 200, 0.4)'), 
+            # ✨ 關鍵修改：讓線條與圓點都綁定同一個專屬顏色！
+            line=dict(width=2, color=stock_color),
             marker=dict(
                 size=marker_sizes,
-                color=group['net_diff_ratio'],
-                colorscale='Turbo',
-                cmin=-20, cmax=20, 
-                showscale=False 
+                color=stock_color,
+                opacity=0.9
             ),
             textfont=dict(color='white', size=12),
             showlegend=False
         ))
 
-    # 💡 簡化色條設定：改用最相容的字串標題，避開所有版本相容性地雷
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode='markers',
-        marker=dict(
-            colorscale='Turbo', 
-            cmin=-20, 
-            cmax=20, 
-            showscale=True, 
-            colorbar=dict(
-                title="大戶差比 (%)", 
-
-            )
-        )
-    ))
+    # ⚠️ 註解：原本下方的「簡化色條設定 (add_trace)」已經徹底刪除！
+    # 因為圓點不再依照 Y 軸數值變色，所以右側的色條已經不需要了。
 
     # 4. 象限文字標籤
     fig.add_annotation(x=85, y=30, text="<b>領先區 [強勢主流]</b>", showarrow=False, font=dict(color="#00FF66", size=14))
