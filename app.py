@@ -394,11 +394,10 @@ with col1:
             else:
                 df_metrics = pd.DataFrame()
                 
-        except Exception as e:
-            st.warning(f"⚠️ 數據抓取或軌跡合成中斷：{e}")
-            # 加上安全的預設欄位結構，防止下方畫圖時因為缺欄位而當機
-            df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
-            
+       except Exception as e:
+            # 印出詳細錯誤以便我們看清到底是哪一行出事
+            st.warning(f"⚠️ 數據抓取或軌跡合成中斷，詳細原因：{repr(e)}")
+            df_metrics = pd.DataFrame()
   
         if not df_metrics.empty:
             # 💡 呼叫全新的「帶軌跡版本」繪圖函式
