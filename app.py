@@ -361,20 +361,54 @@ with col1:
             #     st.warning(f"⚠️ API 連線提示: {e}")
             pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
 
-      # 🚀 實戰模式：呼叫 shioaji_data_fetcher.py 裡的真實抓取函式
+      # 🚀 實戰模式：抓取真實 API 數據並計算大戶籌碼指標
         try:
-            # 呼叫你剛剛確認的正確函式名稱，並帶入你的 sj_api 與當前族群清單
-            raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks)
+            # 1. 抓取原始 Tick 數據
+            raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks, threshold=threshold_slider * 10000)
             
-            # 如果成功抓到 raw_ticks，我們把它轉成畫面需要的格式
             if not raw_ticks.empty:
-                # 這裡可以根據你畫面需求的 df_metrics 格式進行整理
-                df_metrics = raw_ticks.copy() # 先暫時直接使用，或進行後續欄位對應
+                # 2. 依照代碼分組，計算 X 軸（大戶買賣比）與 Y 軸（大戶淨差比）
+                metrics_list = []
+                for code in sector_stocks:
+                    df_stock = raw_ticks[raw_ticks['code'] == str(code)]
+                    if df_stock.empty:
+                        continue
+                    
+                    # 取得中文股名
+                    try:
+                        name = sj_api.Contracts.Stocks[str(code)].name
+                    except:
+                        name = str(code)
+                    
+                    # 計算大戶買入與賣出總金額
+                    buy_df = df_stock[df_stock['action'] == 'B']
+                    sell_df = df_stock[df_stock['action'] == 'S']
+                    
+                    buy_amt = buy_df['amount'].sum() if not buy_df.empty else 0
+                    sell_amt = sell_df['amount'].sum() if not sell_df.empty else 0
+                    total_amt = buy_amt + sell_amt
+                    
+                    # 計算 X 軸：大戶買賣比率 (買入佔總成交的百分比)
+                    buy_sell_ratio = (buy_amt / total_amt * 100) if total_amt > 0 else 50.0
+                    
+                    # 計算 Y 軸：大戶淨差異比 ((買 - 賣) / 總成交)
+                    net_diff_ratio = ((buy_amt - sell_amt) / total_amt * 100) if total_amt > 0 else 0.0
+                    
+                    metrics_list.append({
+                        'code': str(code),
+                        'name': name,
+                        'date': datetime.today().strftime("%Y-%m-%d"),
+                        'buy_sell_ratio': round(buy_sell_ratio, 2),
+                        'net_diff_ratio': round(net_diff_ratio, 2),
+                        'total_amount': total_amt
+                    })
+                
+                df_metrics = pd.DataFrame(metrics_list)
             else:
                 df_metrics = pd.DataFrame()
                 
         except Exception as e:
-            st.warning(f"⚠️ 真實 API 數據抓取中斷：{e}")
+            st.warning(f"⚠️ 真實 API 數據計算中斷：{e}")
             df_metrics = pd.DataFrame()
             
             for code in sector_stocks:
