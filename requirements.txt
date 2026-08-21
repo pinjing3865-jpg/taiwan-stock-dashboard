@@ -1,4 +1,5 @@
-streamlit
+streamlit>=1.35.0
+shioaji
 pandas
 requests
 matplotlib
@@ -6,5 +7,4 @@ html5lib
 lxml
 tabulate
 yfinance
-streamlit>=1.35.0
 plotly

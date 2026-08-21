@@ -6,6 +6,21 @@ import time
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import shioaji_data_fetcher
+import shioaji as sj
+import chip_visualizer
+
+# 初始化並使用保險箱金鑰登入永豐 API (利用 Streamlit cache 避免每次重整畫面都重新登入)
+@st.cache_resource
+def init_shioaji():
+    api = sj.Shioaji()
+    api.login(
+        api_key=st.secrets["SHIOAJI_API_KEY"],
+        secret_key=st.secrets["SHIOAJI_SECRET_KEY"]
+    )
+    return api
+
+sj_api = init_shioaji()
 
 # 匯入分析模組
 from rrg_calculator import calculate_rrg_quadrants
@@ -305,15 +320,115 @@ for sector_name, df_sector in sector_dataframes.items():
             strong_sectors[sector_name] = latest_status
 
 # 左右雙欄配置
-col1, col2 = st.columns([1.5, 2])
+col1, col2 = st.columns([4, 6])
 
 with col1:
-    st.subheader("📊 RRG 動能旋轉圖 (波段平滑化過濾雜訊)")
+    # 1. 上方維持顯示原本的 RRG 動態旋轉圖
+    st.subheader("📊 RRG 動態旋轉圖")
     if rrg_all_history:
-       fig = plot_rrg_chart(rrg_all_history)
-       st.plotly_chart(fig, use_container_width=True)
+        fig = plot_rrg_chart(rrg_all_history)
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("⚠️ 目前尚無足夠的 RRG 歷史數據可供繪圖。")
+        st.warning("⚠️ 目前尚無足夠的 RRG 歷史數據可供繪製。")
+
+    st.markdown("---") # 分隔線
+
+    # 2. 下方顯示同步側邊欄的大戶籌碼四象限輪動圖 (XQ 定義版)
+    st.subheader("🎯 大戶籌碼四象限解析 (按 XQ 最新定義)")
+    
+    # 💡 新增：加入滑桿讓你可以即時調整大戶認定門檻 (50萬~500萬)
+    threshold_slider = st.slider("調整大戶認定門檻 (萬元)", 50, 500, 300, step=50, key="chip_threshold")
+    threshold_val = threshold_slider * 10000
+
+    if 'selected_sectors' in locals() and selected_sectors:
+        current_target_sector = selected_sectors[0]
+        # 更新標題顯示當前門檻
+        st.info(f"🔗 已同步選取：**{current_target_sector}** | 當前大戶門檻：**{threshold_slider}萬**")
+        
+        sector_stocks = my_custom_sectors.get(current_target_sector, [])
+
+        df_metrics = pd.DataFrame()
+        if sector_stocks:
+            # ==========================================
+            # 🛑 暫時註解掉真實 API，強制進入軌跡模擬模式測試
+            # ==========================================
+            # try:
+            #     with st.spinner('正在分析籌碼...'):
+            #         raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks)
+            #         if not raw_ticks.empty:
+            #             df_metrics = chip_visualizer.calculate_xq_chip_metrics(raw_ticks, threshold=threshold_val)
+            # except Exception as e:
+            #     st.warning(f"⚠️ API 連線提示: {e}")
+            pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
+
+       # 💤 模擬軌跡模式 (自動抓取真實股名版)
+        if df_metrics.empty and sector_stocks:
+            import hashlib
+            from datetime import timedelta, datetime
+            
+            mock_history_metrics = []
+            today = datetime.today()
+            
+            for code in sector_stocks:
+                h = int(hashlib.md5(str(code).encode()).hexdigest(), 16)
+                
+                # 💡 直接向 Shioaji API 查詢真實股名，使用你的變數名稱 sj_api
+                try:
+                    real_name = sj_api.Contracts.Stocks[str(code)].name
+                except:
+                    real_name = str(code) # 防呆機制：萬一 API 查不到，就先顯示代號
+                
+                base_buy_sell = 45.0 + (h % 4500) / 100.0
+                base_net_diff = -20.0 + ((h // 100) % 4000) / 100.0
+                
+                for i in range(4, -1, -1):
+                    sim_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+                    offset_x = (i * 2.5) * (-1 if h % 2 == 0 else 1) 
+                    offset_y = (i * 1.5) * (-1 if h % 3 == 0 else 1)
+                    
+                    mock_history_metrics.append({
+                        'code': str(code),
+                        'name': real_name,  # 👈 這裡就會自動帶入正確的中文股名了！
+                        'date': sim_date,
+                        'buy_sell_ratio': round(base_buy_sell + offset_x, 2),
+                        'net_diff_ratio': round(base_net_diff + offset_y, 2),
+                        'total_amount': 50000000
+                    })
+            
+            df_metrics = pd.DataFrame(mock_history_metrics)
+
+        if not df_metrics.empty:
+            # 💡 呼叫全新的「帶軌跡版本」繪圖函式
+            if 'date' in df_metrics.columns:
+                fig_chip = chip_visualizer.plot_xq_chip_rotation_with_trajectory(
+                    df_metrics, 
+                    title=f"【{current_target_sector}】大戶籌碼輪動與近期軌跡 (門檻: {threshold_slider}萬)"
+                )
+            else:
+                # 兼容沒有歷史資料的狀況
+                fig_chip = chip_visualizer.plot_xq_chip_rotation_chart(
+                    df_metrics, 
+                    title=f"【{current_target_sector}】大戶籌碼輪動 (門檻: {threshold_slider}萬)"
+                )
+            
+            # 強制覆寫黑底保護
+            fig_chip.update_layout(
+                paper_bgcolor='#000000',
+                plot_bgcolor='#000000',
+                font=dict(color='white')
+            )
+            st.plotly_chart(fig_chip, width="stretch", theme=None)
+            
+            with st.expander(f"📋 【{current_target_sector}】十大人氣個股籌碼數據總覽"):
+                if 'date' in df_metrics.columns:
+                    latest_date = df_metrics['date'].max()
+                    df_display = df_metrics[df_metrics['date'] == latest_date]
+                else:
+                    df_display = df_metrics
+                # 💡 這裡也改為 width="stretch"
+                st.dataframe(df_display.sort_values(by='net_diff_ratio', ascending=False), width="stretch")
+        else:
+            st.warning("⚠️ 目前該族群無對應的股票籌碼資料。")
 
 with col2:
     st.subheader("🏆 動能強勢群組：營收與三率檢驗")
@@ -462,3 +577,6 @@ with col2:
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         st.error(f"⚠️ 無法取得 {ticker} 的歷史 K 線資料。")
+
+                       # ==========================================
+

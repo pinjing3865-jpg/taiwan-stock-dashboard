@@ -1,0 +1,4 @@
+fig_chip = chip_visualizer.plot_xq_chip_rotation_chart(
+    df_metrics, 
+    title=f"【{current_target_sector}】大戶籌碼熱門股輪動圖 (XQ 定義)"
+)

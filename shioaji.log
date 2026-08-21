@@ -1,0 +1,75 @@
+[pid:44380] 2026-08-20T16:29:12.479764Z ERROR shioaji::utils: get site info failed 0 time, error: error sending request for url (https://sinotrade.gitlab.io/control/site/prod), retrying...
+[pid:44380] 2026-08-20T16:29:12.854289Z  INFO shioaji::api::api_v1::auth::token_login: No cached token available, performing new login
+[pid:44380] 2026-08-20T16:29:12.984851Z  INFO shioaji::api: P2P receiver closed: Closed
+[pid:44380] 2026-08-20T16:29:12.984887Z  INFO shioaji::api: msg receiver error: Closed
+[pid:33704] 2026-08-20T16:33:09.192353Z  INFO shioaji::api::api_v1::auth::token_login: No cached token available, performing new login
+[pid:33704] 2026-08-20T16:33:09.402000Z  INFO shioaji::api::api_v1::auth::token_login: Stored new token in slot 1
+[pid:33704] 2026-08-20T16:33:09.425660Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:33704] 2026-08-20T16:33:09.426018Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="miss_or_stale" block="base" region=TW security_type=STK bytes=0
+[pid:33704] 2026-08-20T16:33:09.439714Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_base" region=TW security_type=STK bytes=51392
+[pid:33704] 2026-08-20T16:33:09.460738Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="miss" block="info" region=TW security_type=STK bytes=0
+[pid:33704] 2026-08-20T16:33:09.499315Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_info" region=TW security_type=STK shard="" bytes=308857
+[pid:41608] 2026-08-20T16:44:02.301415Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:41608] 2026-08-20T16:44:02.345538Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:41608] 2026-08-20T16:44:02.354914Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:41608] 2026-08-20T16:44:02.390425Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9311
+[pid:41608] 2026-08-20T16:44:02.417909Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86495
+[pid:41608] 2026-08-20T16:44:02.590037Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:18536] 2026-08-20T17:16:26.043828Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:18536] 2026-08-20T17:16:26.097870Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-20T17:19:26.080674Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-20T17:19:26.088054Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9311
+[pid:18536] 2026-08-20T17:19:26.095086Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86495
+[pid:18536] 2026-08-20T17:27:12.383982Z  INFO shioaji::api::api_v1::auth::token_login: No cached token available, performing new login
+[pid:18536] 2026-08-20T17:27:12.588487Z  INFO shioaji::api::api_v1::auth::token_login: Stored new token in slot 2
+[pid:18536] 2026-08-20T17:30:13.698785Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-20T17:30:13.701740Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9311
+[pid:18536] 2026-08-20T17:30:13.707125Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86495
+[pid:18536] 2026-08-20T17:30:14.070796Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:18536] 2026-08-20T18:08:39.435255Z ERROR shioaji::utils: get site info failed 0 time, error: error sending request for url (https://sinotrade.gitlab.io/control/site/prod), retrying...
+[pid:18536] 2026-08-20T18:08:39.829847Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:18536] 2026-08-20T18:08:39.865517Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-20T18:11:12.872269Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-20T18:11:12.911156Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9311
+[pid:18536] 2026-08-20T18:11:12.945533Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86495
+[pid:18536] 2026-08-20T18:11:16.219271Z  INFO shioaji::api::token_pool: Successfully released token slot 2 via temporary runtime
+[pid:18536] 2026-08-20T23:45:17.298398Z  INFO shioaji::api: Received SYS/CONTRACT event: UpdateContract { action: Check, region: Some(TW), security_type: STK, published_at: 1787269517.515221, base_hash: Some("63506a3a13ea2d0f1c2c058979e698e2"), info_hash: Some("f616acf1524cc1d095c5a660254ffe0a"), info_shards: None, info_scope: None, event_id: None, chunk_index: None, chunk_count: None }
+[pid:18536] 2026-08-20T23:45:17.298611Z  INFO _core::api::stream::handlers::contract_event: SYS/CONTRACT event: action=Check, region=Some(TW), security_type=STK, published_at=1787269517.515221
+[pid:18536] 2026-08-21T00:18:13.238711Z  INFO shioaji::api: Received SYS/CONTRACT event: UpdateContract { action: Check, region: Some(TW), security_type: STK, published_at: 1787271493.586956, base_hash: None, info_hash: Some("2154f318718d74b82064a0aa259261f6"), info_shards: None, info_scope: None, event_id: None, chunk_index: None, chunk_count: None }
+[pid:18536] 2026-08-21T00:18:13.238864Z  INFO _core::api::stream::handlers::contract_event: SYS/CONTRACT event: action=Check, region=Some(TW), security_type=STK, published_at=1787271493.586956
+[pid:18536] 2026-08-21T01:16:47.006294Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-21T01:16:47.036228Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="miss_or_stale" block="base" region=TW security_type=STK bytes=0
+[pid:18536] 2026-08-21T01:16:47.055099Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_base" region=TW security_type=STK bytes=51427
+[pid:18536] 2026-08-21T01:16:47.099662Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="stale" block="info" region=TW security_type=STK bytes=86495
+[pid:18536] 2026-08-21T01:16:47.141327Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_info" region=TW security_type=STK shard="" bytes=309036
+[pid:18536] 2026-08-21T01:41:52.299544Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 2, verifying...
+[pid:18536] 2026-08-21T01:41:52.340194Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-21T01:44:31.656967Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-21T01:44:31.690721Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9314
+[pid:18536] 2026-08-21T01:44:31.718405Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86461
+[pid:18536] 2026-08-21T01:44:34.864447Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:18536] 2026-08-21T01:53:42.875570Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:18536] 2026-08-21T01:53:42.908622Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-21T01:56:20.439903Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:18536] 2026-08-21T01:56:20.441806Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9314
+[pid:18536] 2026-08-21T01:56:20.446375Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86461
+[pid:18536] 2026-08-21T01:56:23.666640Z  INFO shioaji::api::token_pool: Successfully released token slot 2 via temporary runtime
+[pid:18536] 2026-08-21T02:00:40.171174Z ERROR shioaji::utils: get site info failed 0 time, error: error sending request for url (https://sinotrade.gitlab.io/control/site/prod), retrying...
+[pid:18536] 2026-08-21T02:00:40.547074Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 2, verifying...
+[pid:18536] 2026-08-21T02:00:40.601822Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-21T02:03:36.588721Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:18536] 2026-08-21T02:10:44.988232Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:18536] 2026-08-21T02:10:45.028062Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:18536] 2026-08-21T02:13:26.498995Z  INFO shioaji::api::token_pool: Successfully released token slot 2 via temporary runtime
+[pid:18536] 2026-08-21T02:26:03.972392Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:26328] 2026-08-21T02:26:33.742905Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:26328] 2026-08-21T02:26:33.802683Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:26328] 2026-08-21T02:36:52.698183Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 2, verifying...
+[pid:26328] 2026-08-21T02:36:52.751768Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:26328] 2026-08-21T02:40:06.385715Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
+[pid:31676] 2026-08-21T03:05:48.146208Z  INFO shioaji::api::api_v1::auth::token_login: Found cached token from slot 1, verifying...
+[pid:31676] 2026-08-21T03:05:48.199726Z  INFO shioaji::api::api_v1::auth::token_login: Cached token is valid, using it
+[pid:31676] 2026-08-21T03:20:34.498192Z  INFO shioaji::contracts_v2::traffic: contract backend response endpoint="contracts_version" regions=Some([TW]) security_types=Some([Stock]) bytes=198
+[pid:31676] 2026-08-21T03:20:34.502851Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="base" region=TW security_type=STK bytes=9314
+[pid:31676] 2026-08-21T03:20:34.507987Z  INFO shioaji::contracts_v2::traffic: contract disk cache cache="hit" block="info" region=TW security_type=STK bytes=86461
+[pid:31676] 2026-08-21T03:26:46.332316Z  INFO shioaji::api::token_pool: Successfully released token slot 1 via temporary runtime
