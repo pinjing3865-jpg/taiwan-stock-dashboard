@@ -396,7 +396,8 @@ with col1:
                 
         except Exception as e:
             st.warning(f"⚠️ 數據抓取或軌跡合成中斷：{e}")
-            df_metrics = pd.DataFrame()
+            # 加上安全的預設欄位結構，防止下方畫圖時因為缺欄位而當機
+            df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
             
   
         if not df_metrics.empty:
