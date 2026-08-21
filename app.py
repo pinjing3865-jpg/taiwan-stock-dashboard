@@ -361,17 +361,21 @@ with col1:
             #     st.warning(f"⚠️ API 連線提示: {e}")
             pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
 
-       # 🚀 實戰模式：呼叫真實的 Shioaji API 與計算模組
+      # 🚀 實戰模式：呼叫 shioaji_data_fetcher.py 裡的真實抓取函式
         try:
-            # 1. 呼叫你寫在 shioaji_data_fetcher.py 裡面的真實抓取函式
+            # 呼叫你剛剛確認的正確函式名稱，並帶入你的 sj_api 與當前族群清單
             raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks)
             
-            # 2. 將原始 Tick 數據轉換為軌跡所需的指標與歷史資料
-            df_metrics = shioaji_data_fetcher.calculate_chip_metrics_with_history(raw_ticks, sj_api)
-            
+            # 如果成功抓到 raw_ticks，我們把它轉成畫面需要的格式
+            if not raw_ticks.empty:
+                # 這裡可以根據你畫面需求的 df_metrics 格式進行整理
+                df_metrics = raw_ticks.copy() # 先暫時直接使用，或進行後續欄位對應
+            else:
+                df_metrics = pd.DataFrame()
+                
         except Exception as e:
-            st.error(st.error(f"⚠️ 真實 API 數據抓取失敗或連線中斷：{e}"))
-            df_metrics = pd.DataFrame() # 確保防呆機制起作用，畫面不會崩潰
+            st.warning(f"⚠️ 真實 API 數據抓取中斷：{e}")
+            df_metrics = pd.DataFrame()
             
             for code in sector_stocks:
                 h = int(hashlib.md5(str(code).encode()).hexdigest(), 16)
