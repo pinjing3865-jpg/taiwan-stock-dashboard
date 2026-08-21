@@ -361,13 +361,17 @@ with col1:
             #     st.warning(f"⚠️ API 連線提示: {e}")
             pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
 
-       # 💤 模擬軌跡模式 (自動抓取真實股名版)
-        if df_metrics.empty and sector_stocks:
-            import hashlib
-            from datetime import timedelta, datetime
+       # 🚀 實戰模式：呼叫真實的 Shioaji API 與計算模組
+        try:
+            # 1. 呼叫你寫在 shioaji_data_fetcher.py 裡面的真實抓取函式
+            raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks)
             
-            mock_history_metrics = []
-            today = datetime.today()
+            # 2. 將原始 Tick 數據轉換為軌跡所需的指標與歷史資料
+            df_metrics = shioaji_data_fetcher.calculate_chip_metrics_with_history(raw_ticks, sj_api)
+            
+        except Exception as e:
+            st.error(st.error(f"⚠️ 真實 API 數據抓取失敗或連線中斷：{e}"))
+            df_metrics = pd.DataFrame() # 確保防呆機制起作用，畫面不會崩潰
             
             for code in sector_stocks:
                 h = int(hashlib.md5(str(code).encode()).hexdigest(), 16)
