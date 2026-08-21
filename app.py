@@ -363,39 +363,57 @@ with col1:
 
      # 🚀 實戰模式：抓取真實 API 數據並累積歷史記憶
         try:
-            # 1. 抓取當日原始 Tick
             raw_ticks = shioaji_data_fetcher.get_big_player_chips_raw(sj_api, sector_stocks, threshold=threshold_slider * 10000)
             
             if not raw_ticks.empty:
-                # 2. 計算今日指標 (與剛才相同)
-                today_metrics = []
+                metrics_list = []
                 for code in sector_stocks:
                     df_stock = raw_ticks[raw_ticks['code'] == str(code)]
-                    if df_stock.empty: continue
+                    if df_stock.empty:
+                        continue
                     
-                    # 計算邏輯... (保留你剛才寫的那段 buy_amt, sell_amt 計算)
-                    # ... (略)
-                    today_metrics.append({ ... }) # 確保格式相同
-
-                # 3. 建立歷史記憶 (關鍵步驟)
-                if 'historical_metrics' not in st.session_state:
-                    st.session_state.historical_metrics = pd.DataFrame()
+                    try:
+                        name = sj_api.Contracts.Stocks[str(code)].name
+                    except:
+                        name = str(code)
+                    
+                    buy_df = df_stock[df_stock['action'] == 'B']
+                    sell_df = df_stock[df_stock['action'] == 'S']
+                    
+                    buy_amt = buy_df['amount'].sum() if not buy_df.empty else 0
+                    sell_amt = sell_df['amount'].sum() if not sell_df.empty else 0
+                    total_amt = buy_amt + sell_amt
+                    
+                    buy_sell_ratio = (buy_amt / total_amt * 100) if total_amt > 0 else 50.0
+                    net_diff_ratio = ((buy_amt - sell_amt) / total_amt * 100) if total_amt > 0 else 0.0
+                    
+                    metrics_list.append({
+                        'code': str(code),
+                        'name': name,
+                        'date': datetime.today().strftime("%Y-%m-%d"),
+                        'buy_sell_ratio': round(buy_sell_ratio, 2),
+                        'net_diff_ratio': round(net_diff_ratio, 2),
+                        'total_amount': total_amt
+                    })
                 
-                # 將今日新數據合併進歷史資料庫
-                new_df = pd.DataFrame(today_metrics)
-                st.session_state.historical_metrics = pd.concat([st.session_state.historical_metrics, new_df], ignore_index=True)
-                
-                # 4. 限制歷史紀錄長度 (例如只保留最近 5 天，避免無限膨脹)
-                if len(st.session_state.historical_metrics['date'].unique()) > 5:
-                    oldest_date = sorted(st.session_state.historical_metrics['date'].unique())[0]
-                    st.session_state.historical_metrics = st.session_state.historical_metrics[st.session_state.historical_metrics['date'] != oldest_date]
-                
-                df_metrics = st.session_state.historical_metrics
+                # 🛡️ 防護罩：確認 metrics_list 裡面真的有資料才處理歷史紀錄！
+                if len(metrics_list) > 0:
+                    if 'historical_metrics' not in st.session_state:
+                        # 初始化時直接給予欄位名稱，避免空表錯誤
+                        st.session_state.historical_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
+                    
+                    new_df = pd.DataFrame(metrics_list)
+                    st.session_state.historical_metrics = pd.concat([st.session_state.historical_metrics, new_df], ignore_index=True)
+                    st.session_state.historical_metrics = st.session_state.historical_metrics.drop_duplicates(subset=['code', 'date'])
+                    
+                    df_metrics = st.session_state.historical_metrics
+                else:
+                    df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
             else:
-                df_metrics = pd.DataFrame()
-               
-        except Exception as e:  # 👈 這裡的 e 必須跟上面的 t 在同一條垂直線上！
-            st.warning(f"⚠️ 數據抓取或軌跡合成中斷，詳細原因：{repr(e)}")
+                df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
+                
+        except Exception as e:
+            # st.warning(f"⚠️ 數據抓取或軌跡合成中斷，詳細原因：{repr(e)}") # 穩定後可以把這行註解掉
             df_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
   
         if not df_metrics.empty:
