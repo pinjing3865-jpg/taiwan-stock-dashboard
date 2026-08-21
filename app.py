@@ -361,6 +361,15 @@ with col1:
             #     st.warning(f"⚠️ API 連線提示: {e}")
             pass # 讓 df_metrics 保持為空，觸發下方的模擬軌跡
 
+        # ✨ 新增：判斷族群是否切換，若切換則清空記憶體，讓新族群重新抓取歷史軌跡！
+        if 'last_sector' not in st.session_state:
+            st.session_state.last_sector = current_target_sector
+            
+        if st.session_state.last_sector != current_target_sector:
+            # 發現族群換了！立刻清空歷史資料表
+            st.session_state.historical_metrics = pd.DataFrame(columns=['code', 'name', 'date', 'buy_sell_ratio', 'net_diff_ratio', 'total_amount'])
+            st.session_state.last_sector = current_target_sector
+
      # 🚀 實戰模式：歷史資料自動回填與抓取
         try:
             if 'historical_metrics' not in st.session_state:
