@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 
-def get_big_player_chips_raw(api, stock_list, threshold=3000000):
+def get_big_player_chips_raw(api, stock_list, threshold=3000000, target_date=None):
     """
     從永豐 Shioaji 抓取指定股票清單的原始成交明細 (Ticks)
     用以計算 XQ 定義的大戶買賣比與大戶差比
@@ -15,15 +15,17 @@ def get_big_player_chips_raw(api, stock_list, threshold=3000000):
     if api is None:
         return pd.DataFrame(columns=['code', 'name', 'amount', 'action'])
 
+    if target_date is None:
+        target_date = datetime.now().strftime("%Y-%m-%d")
     for code in stock_list:
         try:
             # 取得合約物件
             contract = api.Contracts.Stocks[str(code)]
             if not contract:
                 continue
-                
+            
             # 取得當日即時 Tick 資料
-            ticks = api.ticks(contract, date=datetime.now().strftime("%Y-%m-%d"))
+            ticks = api.ticks(contract, date=target_date)
             
             if ticks and len(ticks.close) > 0:
                 # 將 Shioaji 的 tick 資料轉換為 DataFrame
