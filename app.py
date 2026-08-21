@@ -398,34 +398,7 @@ with col1:
             st.warning(f"⚠️ 數據抓取或軌跡合成中斷：{e}")
             df_metrics = pd.DataFrame()
             
-            for code in sector_stocks:
-                h = int(hashlib.md5(str(code).encode()).hexdigest(), 16)
-                
-                # 💡 直接向 Shioaji API 查詢真實股名，使用你的變數名稱 sj_api
-                try:
-                    real_name = sj_api.Contracts.Stocks[str(code)].name
-                except:
-                    real_name = str(code) # 防呆機制：萬一 API 查不到，就先顯示代號
-                
-                base_buy_sell = 45.0 + (h % 4500) / 100.0
-                base_net_diff = -20.0 + ((h // 100) % 4000) / 100.0
-                
-                for i in range(4, -1, -1):
-                    sim_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-                    offset_x = (i * 2.5) * (-1 if h % 2 == 0 else 1) 
-                    offset_y = (i * 1.5) * (-1 if h % 3 == 0 else 1)
-                    
-                    mock_history_metrics.append({
-                        'code': str(code),
-                        'name': real_name,  # 👈 這裡就會自動帶入正確的中文股名了！
-                        'date': sim_date,
-                        'buy_sell_ratio': round(base_buy_sell + offset_x, 2),
-                        'net_diff_ratio': round(base_net_diff + offset_y, 2),
-                        'total_amount': 50000000
-                    })
-            
-            df_metrics = pd.DataFrame(mock_history_metrics)
-
+  
         if not df_metrics.empty:
             # 💡 呼叫全新的「帶軌跡版本」繪圖函式
             if 'date' in df_metrics.columns:
