@@ -395,23 +395,35 @@ with col1:
                         except:
                             name = str(code)
                         
-                        buy_df = df_stock[df_stock['action'] == 'B']
-                        sell_df = df_stock[df_stock['action'] == 'S']
+                        # --- 替換為正確的 XQ 計算邏輯 ---
+                        # 1. 算出全市場總成交金額 (作為 Y 軸分母)
+                        market_total_amt = df_stock['amount'].sum()
                         
-                        buy_amt = buy_df['amount'].sum() if not buy_df.empty else 0
-                        sell_amt = sell_df['amount'].sum() if not sell_df.empty else 0
-                        total_amt = buy_amt + sell_amt
+                        # 2. 依照滑桿門檻，過濾出真正符合條件的「大戶」明細
+                        threshold_value = threshold_slider * 10000
+                        big_df = df_stock[df_stock['amount'] >= threshold_value]
                         
-                        buy_sell_ratio = (buy_amt / total_amt * 100) if total_amt > 0 else 50.0
-                        net_diff_ratio = ((buy_amt - sell_amt) / total_amt * 100) if total_amt > 0 else 0.0
+                        # 3. 分別加總大戶的買進與賣出金額
+                        big_buy_df = big_df[big_df['action'] == 'B']
+                        big_sell_df = big_df[big_df['action'] == 'S']
+                        
+                        big_buy_amt = big_buy_df['amount'].sum() if not big_buy_df.empty else 0
+                        big_sell_amt = big_sell_df['amount'].sum() if not big_sell_df.empty else 0
+                        big_total_amt = big_buy_amt + big_sell_amt
+                        
+                        # 4. 重新計算 X 軸 (大戶買賣比)：大戶買進佔大戶總和的比例 (50% 為中軸)
+                        buy_sell_ratio = (big_buy_amt / big_total_amt * 100) if big_total_amt > 0 else 50.0
+                        
+                        # 5. 重新計算 Y 軸 (大戶差比)：大戶淨買賣超佔「全市場總成交」的比例
+                        net_diff_ratio = ((big_buy_amt - big_sell_amt) / market_total_amt * 100) if market_total_amt > 0 else 0.0
                         
                         metrics_list.append({
                             'code': str(code),
                             'name': name,
-                            'date': current_date, # 確保記錄的是歷史的那一天
+                            'date': current_date,
                             'buy_sell_ratio': round(buy_sell_ratio, 2),
                             'net_diff_ratio': round(net_diff_ratio, 2),
-                            'total_amount': total_amt
+                            'total_amount': market_total_amt
                         })
                     
                     if len(metrics_list) > 0:
